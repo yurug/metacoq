@@ -1001,6 +1001,179 @@ Section Reduce.
 
 End Reduce.
 
+Definition isConstruct c :=
+  match c with
+  | tConstruct _ _ => true
+  | _ => false
+  end.
+
+Inductive conv_pb :=
+| Conv
+| Cumul.
+
+Section Conversion.
+
+  Context (flags : RedFlags.t).
+  Context (Σ : global_context).
+
+  Definition nodelta_flags := RedFlags.mk true true true false true true.
+
+  Definition unfold_one_fix n Γ mfix idx l :=
+    unf <- unfold_fix mfix idx ;;
+    let '(arg, fn) := unf in
+    c <- nth_error l arg ;;
+    cred <- reduce_stack RedFlags.default Σ Γ n c [] ;;
+    let '(cred, _) := cred in
+    if eq_term cred c || negb (isConstruct cred) then None
+    else Some fn.
+
+  Definition unfold_one_case n Γ c :=
+    cred <- reduce_stack_term RedFlags.default Σ Γ n c ;;
+    if eq_term cred c then None
+    else Some cred.
+
+  Definition reducible_head n Γ c l :=
+    match c with
+    | tFix mfix idx => unfold_one_fix n Γ mfix idx l
+    | tCase ind' p' c' brs =>
+      match unfold_one_case n Γ c' with
+      | None => None
+      | Some c' => Some (tCase ind' p' c' brs)
+      end
+    | tConst c =>
+      match lookup_env Σ c with
+      | Some (ConstantDecl _ _ body) => Some body
+      | _ => None
+      end
+    | _ => None
+    end.
+  
+  Fixpoint isconv (n : nat) (leq : conv_pb) (Γ : context)
+           (t1 : term) (l1 : list term) (t2 : term) (l2 : list term) {struct n} : option bool :=
+    match n with 0 => None | S n => 
+    red1 <- reduce_stack nodelta_flags Σ Γ n t1 l1 ;;
+    red2 <- reduce_stack nodelta_flags Σ Γ n t2 l2 ;;
+    let '(t1,l1) := red1 in
+    let '(t2,l2) := red1 in
+    isconv_prog n leq Γ t1 l1 t2 l2
+    end
+  with isconv_prog (n : nat) (leq : conv_pb)
+                   (Γ : context) (t1 : term) (l1 : list term) (t2 : term) (l2 : list term) {struct n} : option bool :=
+    match n with 0 => None | S n =>
+    let isconv_stacks l1 l2 :=
+        ret (forallb2 (fun x y => match isconv n Conv Γ x [] y [] with Some b => b | None => false end) l1 l2)
+    in
+    let on_cond (b : bool) := if b then isconv_stacks l1 l2 else ret false in
+    (** Test equality at each step ?? *)
+    (* if eq_term t1 t2 && (match isconv_stacks l1 l2 with Some true => true | _ => false) *)
+    (* then ret true else *)
+    let fallback (x : unit) :=
+      match reducible_head n Γ t1 l1 with
+      | Some t1 =>
+        redt <- reduce_stack nodelta_flags Σ Γ n t1 l1 ;;
+        let '(t1, l1) := redt in
+        isconv_prog n leq Γ t1 l1 t2 l2
+      | None =>
+        match reducible_head n Γ t2 l2 with
+        | Some t2 =>
+          redt <- reduce_stack nodelta_flags Σ Γ n t2 l2 ;;
+          let '(t2, l2) := redt in
+          isconv_prog n leq Γ t1 l1 t2 l2
+        | None => on_cond (match leq with Conv => eq_term t1 t2 | Cumul => leq_term t1 t2 end)
+        end
+      end
+    in
+    match t1, t2 with
+    | tApp f args, tApp f' args' =>
+      None (* Impossible *)
+
+    | tCast t _ v, tCast u _ v' => None (* Impossible *)
+
+    | tConst c, tConst c' =>
+      if eq_constant c c' then
+        b <- isconv_stacks l1 l2 ;;
+        if b then ret true (* FO optim *)
+        else
+          match lookup_env Σ c with (* Unfold both bodies at once *)
+          | Some (ConstantDecl _ _ body) =>
+            isconv n leq Γ body l1 body l2
+          | _ => ret false
+          end
+      else 
+        match lookup_env Σ c' with
+        | Some (ConstantDecl _ _ body) =>
+          isconv n leq Γ t1 l1 body l2
+        | _ => 
+          match lookup_env Σ c with
+          | Some (ConstantDecl _ _ body) =>
+            isconv n leq Γ body l1 t2 l2
+          | _ => ret false
+          end
+        end
+        
+    | tLambda na b t, tLambda _ b' t' =>
+      cnv <- isconv n Conv Γ b [] b' [] ;;
+      if (cnv : bool) then
+        isconv n Conv (Γ ,, vass na b) t [] t' []
+      else ret false
+        
+    | tProd na b t, tProd _ b' t' =>
+      cnv <- isconv n Conv Γ b [] b' [] ;;
+      if (cnv : bool) then
+        isconv n leq (Γ ,, vass na b) t [] t' []
+      else ret false 
+
+    | tCase (ind, par) p c brs,
+      tCase (ind',par') p' c' brs' => (* Hnf did not reduce, maybe delta needed in c *)
+      if eq_term p p' && eq_term c c' && forallb2 (fun '(a, b) '(a', b') => eq_term b b') brs brs' then
+        ret true
+      else
+        cred <- reduce_stack_term RedFlags.default Σ Γ n c ;;
+        c'red <- reduce_stack_term RedFlags.default Σ Γ n c' ;;
+        if eq_term cred c && eq_term c'red c' then ret false
+        else
+          isconv n leq Γ (tCase (ind, par) p cred brs) l1 (tCase (ind, par) p c'red brs') l2
+
+    | tProj p c, tProj p' c' => on_cond (eq_constant p p' && eq_term c c')
+
+    | tFix mfix idx, tFix mfix' idx' =>
+      (* Hnf did not reduce, maybe delta needed *)
+      if eq_term t1 t2 && match isconv_stacks l1 l2 with Some b => b | None => false end then ret true
+      else 
+        match unfold_one_fix n Γ mfix idx l1 with
+        | Some t1 =>
+          redt <- reduce_stack nodelta_flags Σ Γ n t1 l1 ;;
+          let '(t1, l1) := redt in
+          isconv_prog n leq Γ t1 l1 t2 l2
+        | None =>
+          match unfold_one_fix n Γ mfix' idx' l2 with
+          | Some t2 =>
+            redt <- reduce_stack nodelta_flags Σ Γ n t2 l2 ;;
+            let '(t2, l2) := redt in
+            isconv_prog n leq Γ t1 l1 t2 l2
+          | None => ret false
+          end
+        end
+            
+    | tCoFix mfix idx, tCoFix mfix' idx' =>
+      on_cond (eq_term t1 t2)
+
+    | _, _ => fallback ()
+    end
+    end.
+(*
+    | tRel n, tRel n' => on_cond (Nat.eqb n n')
+    | tMeta n, tMeta n' => on_cond (Nat.eqb n n')
+    | tEvar ev args, tEvar ev' args' =>
+      if Nat.eqb ev ev' then ret (forallb2 eq_term args args') (* FIXME *) else ret false
+    | tVar id, tVar id' => on_cond (eq_string id id')
+    | tSort s, tSort s' => ret (eq_sort s s')
+    | tInd i, tInd i' => on_cond (eq_ind i i')
+    | tConstruct i k, tConstruct i' k' => on_cond (eq_ind i i' && Nat.eqb k k')
+*)      
+End Conversion.
+
+  
 Axiom conv_refl : forall Σ Γ t, Σ ;;; Γ |-- t = t.
 Axiom cumul_refl' : forall Σ Γ t, Σ ;;; Γ |-- t <= t.
 Axiom cumul_trans : forall Σ Γ t u v, Σ ;;; Γ |-- t <= u -> Σ ;;; Γ |-- u <= v -> Σ ;;; Γ |-- t <= v.
@@ -1013,14 +1186,6 @@ Definition try_reduce Σ Γ n t :=
   end.
 
 Conjecture reduce_cumul : forall Σ Γ n t, Σ ;;; Γ |-- try_reduce Σ Γ n t <= t.
-
-Quote Recursively Definition matc' :=
-  (fun y => match y with
-  | 0 => 0
-  | S x => x
-  end).
-
-Definition timpl x y := tProd nAnon x (lift0 1 y).
 
 Class Fuel := { fuel : nat }.
 
@@ -1081,11 +1246,17 @@ Section Typecheck.
   
   Definition convert_leq Γ (t u : term) : typing_result unit :=
     if eq_term t u then ret ()
-    else 
-      t' <- reduce Σ Γ t ;;
-      u' <- reduce Σ Γ u ;;
-      if leq_term t' u' then ret ()
-      else raise (NotConvertible Γ t u t' u').
+    else
+      match isconv Σ fuel Cumul Γ t [] u [] with
+      | Some b =>
+        if b then ret ()
+        else raise (NotConvertible Γ t u t u)
+      | None => (* fallback *)
+        t' <- reduce Σ Γ t ;;
+        u' <- reduce Σ Γ u ;;
+        if leq_term t' u' then ret ()
+        else raise (NotConvertible Γ t u t' u')
+      end.
 
   Definition reduce_to_sort Γ (t : term) : typing_result sort :=
     t' <- hnf_stack Σ Γ t ;;
@@ -1491,29 +1662,7 @@ Section Typecheck.
 
 End Typecheck.
 
-Quote Recursively Definition four := (2 + 2).
-
-Ltac typecheck := start;
-  match goal with
-    |- ?Σ ;;; ?Γ |-- ?t : ?T =>
-    eapply (infer_correct Σ Γ t T); vm_compute; reflexivity
-  end.
-Ltac infer := start;
-  match goal with
-    |- ?Σ ;;; ?Γ |-- ?t : ?T => 
-    eapply (infer_correct Σ Γ t T);
-      let t' := eval vm_compute in (infer Σ Γ t) in
-          change (t' = OfType T); reflexivity
-  end.
-
 Instance default_fuel : Fuel := { fuel := 2 ^ 18 }.
-
-Example typecheck_four : type_program four natr := ltac:(typecheck).
-
-Goal exists ty, type_program four ty.
-Proof.
-  eexists. infer.
-Qed.
 
 Fixpoint fresh id env : bool :=
   match env with
@@ -1595,96 +1744,3 @@ Section Checker.
     check_wf_env Σ ;; infer_term Σ t.
 
 End Checker.
-
-Require Import Morphisms.
-Quote Recursively Definition idq := @Coq.Classes.Morphisms.Proper.
-
-Eval vm_compute in typecheck_program idq.
-
-Require Import Recdef.
-Require Import Coq.omega.Omega.
-Set Implicit Arguments.
-
-(** A function defined using measure or well-founded relation **)
-Function Plus1 (n: nat) {measure id n} : nat :=
-  match n with
-    | 0 => 1
-    | S p => S (Plus1 p)
-  end.
-- intros. unfold id. abstract omega.
-Defined.
-
-Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import Coq.Bool.Bool.
-Require Import Template.Template.
-Require Import Template.Ast.
-
-Unset Template Cast Propositions.
-
-(* Uase template-coq to make a [program] from function defined above *)
-(* Quote Recursively Definition p_Plus1 := Plus1. *)
-
-(* Eval native_compute in typecheck_program p_Plus1. *)
-
-Definition test_reduction (p : program) :=
-    let '(Σ, t) := decompose_program p [] in
-    reduce Σ [] t.
-
-Definition out_typing c :=
-  match c with
-  | OfType t => t
-  | TypeError e => tRel 0
-  end.
-
-Definition out_check c :=
-  match c with
-  | CorrectDecl t => t
-  | EnvError e => tRel 0
-  end.
-
-Ltac interp_red c :=
-  let t:= eval vm_compute in (out_typing (test_reduction c)) in exact t.
-
-Ltac interp_infer c :=
-  let t:= eval vm_compute in (out_check (typecheck_program c)) in exact t.
-
-Ltac term_type c :=
-  let X := type of c in exact X.
-
-Ltac quote_type c :=
-  let X := type of c in
-  quote_term X ltac:(fun Xast => exact Xast).
-
-Notation convertible x y := (@eq_refl _ x : x = y).
-
-Module Test1.
-  Definition term := (Nat.mul 2 62).
-  Load "test_term.v".
-End Test1.
-
-Module Test2.
-  Definition term := (fun (f : nat -> nat) (x : nat) => f (f x)).
-  Load "test_term.v".
-End Test2.
-
-Module Test3.
-  Definition term := (id 0).
-  Load "test_term.v".
-End Test3.
-
-Module Test4.
-  Definition term := @id.
-  Set Printing Universes.
-  Load "test_term.v".
-End Test4.
-
-(* Require Import ExtrOcamlBasic. *)
-(* Require Import ExtrOcamlString. *)
-
-(* Set Extraction Optimize. *)
-
-(* Recursive Extraction typecheck_program. *)
-(** Compile template_program using certicoq and bind to template, voilà: 
-    a certified typechecker of Coq vos! *)
