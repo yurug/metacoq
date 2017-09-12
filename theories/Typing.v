@@ -42,6 +42,18 @@ Next Obligation.
   simpl in H. auto with arith.
 Qed.
 
+Lemma nth_error_safe_nth {A} n (l : list A) (isdecl : n < Datatypes.length l) :
+  nth_error l n = Some (safe_nth l (exist _ n isdecl)).
+Proof.
+  revert n isdecl; induction l; intros.
+  - inversion isdecl.
+  - destruct n as [| n']; simpl.
+    reflexivity.
+    simpl in IHl.
+    simpl in isdecl.
+    now rewrite <- IHl.
+Qed.
+
 Definition succ_sort s :=
   match s with
   | sProp => sType xH
@@ -321,7 +333,7 @@ Definition fix_subst (l : mfixpoint term) :=
 
 Definition unfold_fix (mfix : mfixpoint term) (idx : nat) :=
   match List.nth_error mfix idx with
-  | Some d => Some (d.(rarg _), substl (fix_subst mfix) d.(dbody _))
+  | Some d => Some (d.(rarg), substl (fix_subst mfix) d.(dbody))
   | None => None
   end.
 
@@ -452,11 +464,6 @@ Definition eq_ind i i' :=
 
 Definition eq_constant := eq_string.
 
-Arguments dname {term} _.
-Arguments dtype {term} _.
-Arguments dbody {term} _.
-Arguments rarg {term} _.
-
 Fixpoint eq_term (t u : term) {struct t} :=
   match t, u with
   | tRel n, tRel n' => Nat.eqb n n'
@@ -565,7 +572,7 @@ Inductive typing (Σ : global_context) (Γ : context) : term -> term -> Prop :=
 
 | type_Case indpar p c brs args :
     Σ ;;; Γ |-- c : mktApp (tInd (fst indpar)) args ->
-    (** TODO check brs *)                  
+    (** TODO check p, brs *)
     Σ ;;; Γ |-- tCase indpar p c brs : tApp p (List.skipn (snd indpar) args ++ [c])
 
 | type_Proj p c :
@@ -677,12 +684,25 @@ Inductive type_global_env : global_context -> Prop :=
     type_global_env (ConstantDecl id ty trm :: Σ)                     
 | globenv_ax Σ id ty s :
     type_global_env Σ ->
+    fresh_global id Σ ->
     Σ ;;; [] |-- ty : tSort s ->
     type_global_env (AxiomDecl id ty :: Σ)
 | globenv_ind Σ ind m inds :
     type_global_env Σ ->
+    fresh_global ind Σ ->
     type_inductive Σ inds ->
     type_global_env (InductiveDecl ind m inds :: Σ).
+
+Inductive type_local_env (Σ : global_context) : context -> Prop :=
+| localenv_nil : type_local_env Σ []
+| localenv_cons Γ d :
+    type_local_env Σ Γ ->
+    isType Σ Γ d.(decl_type) ->
+    match d.(decl_body) with
+    | None => True
+    | Some body => Σ ;;; Γ |-- body : d.(decl_type)
+    end ->
+    type_local_env Σ (Γ ,, d).
 
 Definition type_program (p : program) (ty : term) : Prop :=
   let '(Σ, t) := decompose_program p [] in
