@@ -338,7 +338,7 @@ Section Conversion.
         else
           isconv n leq Γ (tCase (ind, par) p cred brs) l1 (tCase (ind, par) p c'red brs') l2
 
-    | tProj p c, tProj p' c' => on_cond (eq_constant p p' && eq_term c c')
+    | tProj p c, tProj p' c' => on_cond (eq_projection p p' && eq_term c c')
 
     | tFix mfix idx, tFix mfix' idx' =>
       (* Hnf did not reduce, maybe delta needed *)
@@ -569,7 +569,7 @@ Section Typecheck.
       match lookup_env Σ ind with
       | Some (InductiveDecl _ _ l) =>
         match nth_error l i with
-        | Some (_, ty, _) => ret ty
+        | Some body => ret body.(ind_type)
         | None => raise (UndeclaredInductive (mkInd ind i))
         end
       |  _ => raise (UndeclaredInductive (mkInd ind i))
@@ -579,8 +579,8 @@ Section Typecheck.
       match lookup_env Σ ind with
       | Some (InductiveDecl _ _ l) =>
         match nth_error l i with
-        | Some (_, _, mkinductive_body cstrs) =>
-          match nth_error cstrs k with
+        | Some body =>
+          match nth_error body.(ctors) k with
           | Some (_, ty, _) =>
             ret (substl (inds ind l) ty)
           | None => raise (UndeclaredConstructor (mkInd ind i) k)
@@ -914,9 +914,8 @@ Section Checker.
       check_wf_judgement id Σ term ty
     | AxiomDecl id ty => check_wf_type id Σ ty
     | InductiveDecl id par inds =>
-      List.fold_left (fun acc '(id, ty, body) =>
-                        acc ;;
-                            check_wf_type id Σ ty) inds (ret ())
+      List.fold_left (fun acc body =>
+                        acc ;; check_wf_type body.(ind_name) Σ body.(ind_type)) inds (ret ())
                      
     end.
 

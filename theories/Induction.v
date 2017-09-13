@@ -99,7 +99,7 @@ Lemma term_ind_list :
     (forall (p : inductive * nat) (t : term),
         P t -> forall t0 : term, P t0 -> forall l : list (nat * term),
             tCaseBrsProp P P0 l -> P (tCase p t t0 l)) ->
-    (forall (s : String.string) (t : term), P t -> P (tProj s t)) ->
+    (forall (s : projection) (t : term), P t -> P (tProj s t)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P0 m -> P (tFix m n)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P0 m -> P (tCoFix m n)) -> forall t : term, P t.
 Proof.
@@ -150,7 +150,7 @@ Lemma term_forall_list_ind :
     (forall (p : inductive * nat) (t : term),
         P t -> forall t0 : term, P t0 -> forall l : list (nat * term),
             tCaseBrsProp P (Forall P) l -> P (tCase p t t0 l)) ->
-    (forall (s : String.string) (t : term), P t -> P (tProj s t)) ->
+    (forall (s : projection) (t : term), P t -> P (tProj s t)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P (Forall P) m -> P (tFix m n)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P (Forall P) m -> P (tCoFix m n)) -> forall t : term, P t.
 Proof.
