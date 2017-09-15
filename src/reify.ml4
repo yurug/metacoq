@@ -404,8 +404,7 @@ struct
          (List.map (fun (a,b,c,d) ->
               let c = mk_ctor_list c in
               let d = mk_proj_list d in
-              Term.mkApp (tmkinductive_body, [| a; b; c; d |]))
-                   ls) in
+              Term.mkApp (tmkinductive_body, [| a; b; c; d |])) ls) in
     Term.mkApp (pType, [| kn; p; result |])
     
   let mkConstant kn ty c =
