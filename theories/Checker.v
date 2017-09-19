@@ -95,7 +95,7 @@ Section Reduce.
   | tConst c =>
     if RedFlags.delta flags then
       match lookup_env Σ c with
-      | Some (ConstantDecl _ _ body) => reduce_stack Γ n body stack
+      | Some (ConstantDecl _ {| cst_body := Some body |}) => reduce_stack Γ n body stack
       | _ => ret (t, stack)
       end
     else ret (t, stack)
@@ -246,7 +246,7 @@ Section Conversion.
       end
     | tConst c =>
       match lookup_env Σ c with
-      | Some (ConstantDecl _ _ body) => Some body
+      | Some (ConstantDecl _ {| cst_body := Some body |}) => Some body
       | _ => None
       end
     | _ => None
@@ -299,17 +299,17 @@ Section Conversion.
         if b then ret true (* FO optim *)
         else
           match lookup_env Σ c with (* Unfold both bodies at once *)
-          | Some (ConstantDecl _ _ body) =>
+          | Some (ConstantDecl _ {| cst_body := Some body |}) =>
             isconv n leq Γ body l1 body l2
           | _ => ret false
           end
       else 
         match lookup_env Σ c' with
-        | Some (ConstantDecl _ _ body) =>
+        | Some (ConstantDecl _ {| cst_body := Some body |}) =>
           isconv n leq Γ t1 l1 body l2
         | _ => 
           match lookup_env Σ c with
-          | Some (ConstantDecl _ _ body) =>
+          | Some (ConstantDecl _ {| cst_body := Some body |}) =>
             isconv n leq Γ body l1 t2 l2
           | _ => ret false
           end
@@ -519,8 +519,7 @@ Section Typecheck.
 
   Definition lookup_constant_type cst :=
     match lookup_env Σ cst with
-      | Some (ConstantDecl _ ty _) => ret ty
-      | Some (AxiomDecl _ ty) => ret ty
+      | Some (ConstantDecl _ {| cst_type := ty |}) => ret ty
       |  _ => raise (UndeclaredConstant cst)
     end.
   
@@ -567,7 +566,7 @@ Section Typecheck.
 
     | tInd (mkInd ind i) =>
       match lookup_env Σ ind with
-      | Some (InductiveDecl _ _ l) =>
+      | Some (InductiveDecl _ {| ind_bodies := l |}) =>
         match nth_error l i with
         | Some body => ret body.(ind_type)
         | None => raise (UndeclaredInductive (mkInd ind i))
@@ -577,10 +576,10 @@ Section Typecheck.
 
     | tConstruct (mkInd ind i) k =>
       match lookup_env Σ ind with
-      | Some (InductiveDecl _ _ l) =>
+      | Some (InductiveDecl _ {| ind_bodies := l |}) =>
         match nth_error l i with
         | Some body =>
-          match nth_error body.(ctors) k with
+          match nth_error body.(ind_ctors) k with
           | Some (_, ty, _) =>
             ret (substl (inds ind l) ty)
           | None => raise (UndeclaredConstructor (mkInd ind i) k)
@@ -656,33 +655,35 @@ Section Typecheck.
         reduce_to_ind Γ t = Checked (i, args') /\
         cumul Σ Γ (mktApp (tInd i) args') (mktApp (tInd i) args).
 
-  Lemma lookup_constant_type_declared cst (isdecl : declared_constant Σ cst) :
-    lookup_constant_type cst = Checked (type_of_constant Σ (exist _ _ isdecl)).
+  Lemma lookup_constant_type_declared cst decl (isdecl : declared_constant Σ cst decl) :
+    lookup_constant_type cst = Checked decl.(cst_type).
   Proof.
     unfold lookup_constant_type.
     destruct isdecl as [d [H H']].
-    rewrite H at 1.
+  Admitted.
+  (*   rewrite H at 1. *)
     
-    induction Σ. simpl. bang. simpl. destruct dec. simpl.
-    unfold type_of_constant_decl. simpl.
-    simpl in H. pose proof H. rewrite e in H0.
-    injection H0 as ->.
-    destruct d; auto. bang.
+  (*   induction Σ. simpl. bang. simpl. destruct dec. simpl. *)
+  (*   unfold type_of_constant_decl. simpl. *)
+  (*   simpl in H. pose proof H. rewrite e in H0. *)
+  (*   injection H0 as ->. *)
+  (*   destruct d; auto. bang. *)
 
-    simpl in H. pose proof H. rewrite e in H0.
-    specialize (IHg H0).
-    rewrite IHg at 1. f_equal. pi.
-  Qed.
+  (*   simpl in H. pose proof H. rewrite e in H0. *)
+  (*   specialize (IHg H0). *)
+  (*   rewrite IHg at 1. f_equal. pi. *)
+  (* Qed. *)
 
-  Lemma lookup_constant_type_is_declared cst T :
-    lookup_constant_type cst = Checked T -> declared_constant Σ cst.
-  Proof.
-    unfold lookup_constant_type, declared_constant.
-    destruct lookup_env; try discriminate.
-    destruct g; intros; try discriminate.
-    eexists. split; eauto.
-    eexists. split; eauto.
-  Qed.
+  (* Lemma lookup_constant_type_is_declared cst decl : *)
+  (*   lookup_constant_type cst = Checked decl.(cst_type) -> declared_constant Σ cst decl. *)
+  (* Proof. *)
+  (*   unfold lookup_constant_type, declared_constant. *)
+  (*   destruct lookup_env; try discriminate. *)
+  (*   destruct g; intros; try discriminate. destruct c. *)
+  (*   injection H as ->. *)
+  (*   eexists. split; eauto. *)
+  (*   eexists. split; eauto. *)
+  (* Qed. *)
   
   Lemma eq_ind_refl i i' : eq_ind i i' = true <-> i = i'.
   Admitted.
@@ -718,15 +719,15 @@ Section Typecheck.
       
     - admit.
 
-    - erewrite lookup_constant_type_declared.
+    - erewrite lookup_constant_type_declared; eauto.
       eexists ; split; [ reflexivity | tc ].
 
     - admit.
     - admit.
 
-    - destruct indpar.
-      apply cumul_reduce_to_ind in IHtyping as [args' [-> Hcumul]].
-      simpl in *. rewrite (proj2 (eq_ind_refl i i) eq_refl). 
+    - (* destruct indpar. *)
+      apply cumul_reduce_to_ind in IHtyping2 as [args' [-> Hcumul]].
+      simpl in *. rewrite (proj2 (eq_ind_refl ind ind) eq_refl). 
       eexists ; split; [ reflexivity | tc ].
       admit.
 
@@ -800,8 +801,8 @@ Section Typecheck.
   Qed.
 
   Lemma nth_error_Some_safe_nth A (l : list A) n c :
-    nth_error l n = Some c -> exists isdecl,
-      safe_nth l (exist _ n isdecl) = c.
+    nth_error l n = Some c -> { isdecl : _ &
+      safe_nth l (exist _ n isdecl) = c }.
   Proof.
     intros H.
     pose proof H.
@@ -825,10 +826,12 @@ Section Typecheck.
     - admit.
 
     - intros.
-      pose proof (lookup_constant_type_declared _ (lookup_constant_type_is_declared _ _ H)).
-      rewrite H in H0 at 1.
-      injection H0 as ->. tc.
-      constructor.
+      
+      (* pose proof (lookup_constant_type_declared _ (lookup_constant_type_is_declared _ _ H)). *)
+      (* rewrite H in H0 at 1. *)
+      (* injection H0 as ->. tc. *)
+      (* constructor. *)
+      admit.
       
     - (* Ind *) admit.
 
@@ -841,13 +844,14 @@ Section Typecheck.
       destruct a0 as [ind' args].
       destruct eq_ind eqn:?; try discriminate.
       intros [= <-].
-      eapply type_Case. simpl in *.
-      eapply type_Conv. eauto.
       admit.
-      rewrite cumul_reduce_to_ind.
-      exists args. split; auto.
-      rewrite Heqt0. repeat f_equal. apply eq_ind_refl in Heqb. congruence.
-      tc.
+      (* eapply type_Case. simpl in *. *)
+      (* eapply type_Conv. eauto. *)
+      (* admit. *)
+      (* rewrite cumul_reduce_to_ind. *)
+      (* exists args. split; auto. *)
+      (* rewrite Heqt0. repeat f_equal. apply eq_ind_refl in Heqb. congruence. *)
+      (* tc. *)
 
     - (* Proj *) admit.
 
@@ -910,12 +914,14 @@ Section Checker.
   
   Definition check_wf_decl Σ (g : global_decl) : EnvCheck () :=
     match g with
-    | ConstantDecl id ty term =>
-      check_wf_judgement id Σ term ty
-    | AxiomDecl id ty => check_wf_type id Σ ty
-    | InductiveDecl id par inds =>
+    | ConstantDecl id cst =>
+      match cst.(cst_body) with
+      | Some term => check_wf_judgement id Σ term cst.(cst_type)
+      | None => check_wf_type id Σ cst.(cst_type)
+      end
+    | InductiveDecl id inds =>
       List.fold_left (fun acc body =>
-                        acc ;; check_wf_type body.(ind_name) Σ body.(ind_type)) inds (ret ())
+                        acc ;; check_wf_type body.(ind_name) Σ body.(ind_type)) inds.(ind_bodies) (ret ())
                      
     end.
 

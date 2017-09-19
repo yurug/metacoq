@@ -84,6 +84,7 @@ module type Quoter = sig
   type quoted_decl
   type quoted_program
   type quoted_proj
+  type quoted_sort_family
 
   open Names
 
@@ -91,11 +92,12 @@ module type Quoter = sig
   val quote_name : Name.t -> quoted_name
   val quote_int : int -> quoted_int
   val quote_sort : Sorts.t -> quoted_sort
+  val quote_sort_family : Sorts.family -> quoted_sort_family
   val quote_cast_kind : Constr.cast_kind -> quoted_cast_kind
   val quote_kn : kernel_name -> quoted_kernel_name
   val quote_inductive : quoted_kernel_name * quoted_int -> quoted_inductive
   val quote_proj : quoted_inductive -> quoted_int -> quoted_int -> quoted_proj
-
+    
   val mkName : quoted_ident -> quoted_name
   val mkAnon : quoted_name
 
@@ -120,7 +122,7 @@ module type Quoter = sig
 
   val mkMutualInductive :
     quoted_kernel_name -> quoted_int (* params *) ->
-    (quoted_ident * t (* ind type *) *
+    (quoted_ident * t (* ind type *) * quoted_sort_family list *
        (quoted_ident * t (* constr type *) * quoted_int) list *
          (quoted_ident * t (* projection type *)) list) list ->
      quoted_decl
@@ -146,6 +148,7 @@ struct
   type quoted_recdecl = Term.constr
   type quoted_inductive = Term.constr
   type quoted_proj = Term.constr
+  type quoted_sort_family = Term.constr
 
   type quoted_decl = Term.constr
 
@@ -190,9 +193,13 @@ struct
   let sProp = r_reify "sProp"
   let sSet = r_reify "sSet"
   let sType = r_reify "sType"
+  let sfProp = r_reify "InProp"
+  let sfSet = r_reify "InSet"
+  let sfType = r_reify "InType"
   let tident = r_reify "ident"
   let tIndTy = r_reify "inductive"
   let tmkInd = r_reify "mkInd"
+  let tsort_family = r_reify "sort_family"
   let (tTerm,tRel,tVar,tMeta,tEvar,tSort,tCast,tProd,
        tLambda,tLetIn,tApp,tCase,tFix,tConstructor,tConst,tInd,tCoFix,tProj) =
     (r_reify "term", r_reify "tRel", r_reify "tVar", r_reify "tMeta", r_reify "tEvar",
@@ -312,6 +319,11 @@ struct
 	  sSet
     | Term.Type u -> Term.mkApp (sType, [| quote_universe u |])
 
+  let quote_sort_family = function
+    | Sorts.InProp -> sfProp
+    | Sorts.InSet -> sfSet
+    | Sorts.InType -> sfType
+
   let quote_inductive env (t : Names.inductive) =
     let (m,i) = t in
     Term.mkApp (tmkInd, [| quote_string (Names.string_of_kn (Names.canonical_mind m))
@@ -401,10 +413,11 @@ struct
 
   let mkMutualInductive kn p ls =
     let result = to_coq_list tinductive_body
-         (List.map (fun (a,b,c,d) ->
-              let c = mk_ctor_list c in
-              let d = mk_proj_list d in
-              Term.mkApp (tmkinductive_body, [| a; b; c; d |])) ls) in
+         (List.map (fun (a,b,c,d,e) ->
+              let c = to_coq_list tsort_family c in
+              let d = mk_ctor_list d in
+              let e = mk_proj_list e in
+              Term.mkApp (tmkinductive_body, [| a; b; c; d; e |])) ls) in
     Term.mkApp (pType, [| kn; p; result |])
     
   let mkConstant kn ty c =
@@ -585,7 +598,8 @@ struct
                in ps, acc
             | _ -> [], acc
           in
-	  Declarations.((Q.quote_ident oib.mind_typename, indty, (List.rev reified_ctors), projs) :: ls, acc))
+          let sf = List.map Q.quote_sort_family oib.Declarations.mind_kelim in
+	  Declarations.((Q.quote_ident oib.mind_typename, indty, sf, (List.rev reified_ctors), projs) :: ls, acc))
 	  ([],acc) Declarations.((Array.to_list mib.mind_packets))
       in
       let params = Q.quote_int mib.Declarations.mind_nparams in
