@@ -19,3 +19,4 @@ evars.v
 proj.v
 cofix.v
 CheckerTest.v
+TypingTests.v
