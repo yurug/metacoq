@@ -357,6 +357,7 @@ Definition eq_projection p p' :=
   let '(ind', pars', arg') := p' in
   eq_ind ind ind' && eq_nat pars pars' && eq_nat arg arg'.
 
+(** alpha equivalence *)
 Fixpoint eq_term (t u : term) {struct t} :=
   match t, u with
   | tRel n, tRel n' => eq_nat n n'
@@ -412,7 +413,7 @@ Fixpoint leq_term (t u : term) {struct t} :=
     forallb2 (fun x y =>
                 eq_term x.(dtype) y.(dtype) && eq_term x.(dbody) y.(dbody)) mfix mfix' &&
     eq_nat idx idx'
-  | _, _ => false (* Case, Proj, Fix, CoFix *)
+  | _, _ => false
   end.
 
 Reserved Notation " Σ ;;; Γ |-- t : T " (at level 50, Γ, t, T at next level).
@@ -840,23 +841,47 @@ Inductive Forall (A : Set) (P : A -> Set) : list A -> Set :=
                   P x -> Forall A P l -> Forall A P (x :: l).
 Arguments Forall {A} P l.
 
-Definition on_decl_typing (P : term -> term -> Set) d :=
-  match d with
-  | ConstantDecl id cst =>
-    match cst.(cst_body) with
-    | Some b => P b cst.(cst_type)
-    | None => forall s, P cst.(cst_type) s
+Definition exunique {A : Set} (B : A -> Set) :=
+  { x : A & B x & forall y, B y -> x = y }.
+  
+(* Definition on_decl_typing (P : term -> term -> Set) d := *)
+(*   match d with *)
+(*   | ConstantDecl id cst => *)
+(*     match cst.(cst_body) with *)
+(*     | Some b => P b cst.(cst_type) *)
+(*     | None => forall s, P cst.(cst_type) (tSort s) *)
+(*     end *)
+(*   | InductiveDecl id ind => *)
+(*     Forall (fun ind => forall s, P ind.(ind_type) s) ind.(ind_bodies) *)
+(*   end. *)
+Notation wf := type_global_env.
+
+Definition on_decl_typing Σ (P : term -> term -> Set) d : type_global_decl Σ d -> Set :=
+  match d return type_global_decl Σ d -> Set with
+  | ConstantDecl id cst =>  
+    match cst.(cst_body) as o return
+          (match o with
+          | Some trm => Σ;;;[] |-- trm : cst_type cst
+          | None => isType Σ [] (cst_type cst)
+           end) -> Set
+    with
+    | Some b => fun Hty => P b cst.(cst_type)
+    | None => fun Hty => P cst.(cst_type) (tSort (projT1 Hty))
     end
-  | InductiveDecl id ind =>
+  | InductiveDecl id ind => fun Hty =>
     Forall (fun ind => forall s, P ind.(ind_type) s) ind.(ind_bodies)
   end.
 
-Inductive Forall_decls_typing (P : global_context -> term -> term -> Set) : global_context -> Set :=
-| Forall_decls_typing_nil : Forall_decls_typing P nil
-| Forall_decls_typing_cons Σ d :
-    Forall_decls_typing P Σ ->
-    on_decl_typing (fun t T => Σ ;;; [] |-- t : T -> P Σ t T) d ->
-    Forall_decls_typing P (d :: Σ).
+Inductive Forall_decls_typing (P : global_context -> term -> term -> Set)
+  : forall Σ : global_context, wf Σ -> Set :=
+| Forall_decls_typing_nil : Forall_decls_typing P nil globenv_nil
+| Forall_decls_typing_cons Σ wfΣ id d :
+    Forall_decls_typing P Σ wfΣ ->
+    forall (wfΣ : type_global_env Σ)
+           (fresh : fresh_global id Σ)
+           (Hty : type_global_decl Σ d),
+    on_decl_typing Σ (fun t T => P Σ t T) d Hty ->
+    Forall_decls_typing P (d :: Σ) (globenv_decl Σ id d wfΣ fresh Hty).
 
 Definition size := nat.
 
@@ -912,11 +937,10 @@ Require Import Wf.
 Require Import Wellfounded Relation_Definitions.
 Require Import Relation_Operators Lexicographic_Product Wf_nat.
 Implicit Arguments lexprod [A B].
-Notation wf := type_global_env.
 
 Definition env_prop (P : forall Σ Γ t T, Set) :=
   forall Σ (wfΣ : wf Σ) Γ t T, Σ ;;; Γ |-- t : T ->
-    Forall_decls_typing (fun Σ t ty => P Σ [] t ty) Σ *
+    Forall_decls_typing (fun Σ t ty => P Σ [] t ty) Σ wfΣ *
     P Σ Γ t T.
 
 Lemma env_prop_typing P : env_prop P ->
@@ -926,8 +950,8 @@ Proof. intros. now apply H. Qed.
 
 Lemma env_prop_sigma P : env_prop P ->
   forall Σ (wf : wf Σ),
-    Forall_decls_typing (fun (Σ0 : global_context) (t0 ty : term) => P Σ0 [] t0 ty) Σ.
-Proof. intros. eapply H. apply wf. apply (type_Sort Σ [] sSet). Qed.
+    Forall_decls_typing (fun (Σ0 : global_context) (t0 ty : term) => P Σ0 [] t0 ty) Σ wf.
+Proof. intros. eapply H. apply (type_Sort Σ [] sSet). Qed.
 
 (** An induction principle ensuring the Σ declarations enjoy the same properties.
 
@@ -962,7 +986,7 @@ Lemma typing_ind_env :
 
     (forall Σ (wfΣ : wf Σ) (Γ : context) (cst : ident) (decl : constant_decl),
         declared_constant Σ cst decl ->
-        Forall_decls_typing (fun Σ t ty => P Σ [] t ty) Σ ->
+        Forall_decls_typing (fun Σ t ty => P Σ [] t ty) Σ wfΣ ->
         P Σ Γ (tConst cst) (cst_type decl)) ->
 
         (forall Σ (wfΣ : wf Σ) (Γ : context) (ind : inductive) (decl : inductive_body),
@@ -1010,6 +1034,7 @@ Proof.
                             (fun Σ => MR lt (fun x => typing_size (projT2 (projT2 (projT2 (projT2 x)))))))).
   set(foo := existT _ Σ (existT _ wfΣ (existT _ Γ (existT _ t (existT _ _ H14)))) : { Σ : _ & { wfΣ : wf Σ & { Γ : context & { t : term & { T : term & Σ ;;; Γ |-- t : T }} } }}).
   change Σ with (projT1 foo).
+  change wfΣ with (projT1 (projT2 foo)).
   change Γ with (projT1 (projT2 (projT2 foo))).
   change t with (projT1 (projT2 (projT2 (projT2 foo)))).
   change T with (projT1 (projT2 (projT2 (projT2 (projT2 foo))))).
@@ -1019,35 +1044,38 @@ Proof.
   end.
   forward p; [ | apply p; apply wf_lexprod; intros; apply measure_wf; apply lt_wf].
   clear p.
+  simpl.
   clear Σ wfΣ Γ t T H14.
   intros (Σ&wfΣ&Γ&t&t0&H14). simpl.
-  intros IH. unfold MR in IH. simpl in IH.
-  split.
-  destruct Σ.
+  intros IH. unfold MR in IH. simpl in IH.  split.
+  destruct Σ. destruct wfΣ.
   constructor.
-  inversion_clear wfΣ.
-  constructor.
-  specialize (IH (existT _ Σ (existT _ H15 (existT _ Γ (existT _ (tSort sProp) (existT _ (tSort (succ_sort sProp)) (type_Sort _ _ sProp))))))). 
+  econstructor. 
+  specialize (IH (existT _ Σ (existT _ wfΣ (existT _ Γ (existT _ (tSort sProp) (existT _ (tSort (succ_sort sProp)) (type_Sort _ _ sProp))))))). 
   simpl in IH. forward IH. constructor 1. simpl. omega.
   apply IH.
-  destruct g; simpl.
-  destruct cst_body. 
-  simpl.
+  destruct d.
+  red. simpl.
+  revert t1 IH. simpl. unfold type_constant_decl.
+  destruct c. 
+  simpl. destruct cst_body0. simpl.
   intros.
-  specialize (IH (existT _ Σ (existT _ H15 (existT _ _ (existT _ _ (existT _ _ H18)))))).
+  specialize (IH (existT _ Σ (existT _ wfΣ (existT _ _ (existT _ _ (existT _ _ t2)))))).
   simpl in IH.
   forward IH. constructor 1. simpl; omega.
-  apply IH. 
+  apply IH.
   intros.
-  specialize (IH (existT _ Σ (existT _ H15 (existT _ _ (existT _ _ (existT _ _ H18)))))).
+  destruct t1.
+  specialize (IH (existT _ Σ (existT _ wfΣ (existT _ _ (existT _ _ (existT _ _ t1)))))).
   simpl in IH.
   forward IH. constructor 1. simpl; omega.
-  apply IH. 
+  apply IH.
+  red.
   intros.
   induction (ind_bodies m). constructor.
-  constructor; auto.
+  constructor.
   intros.
-  specialize (IH (existT _ Σ (existT _ H15 (existT _ _ (existT _ _ (existT _ _ H18)))))).
+  specialize (IH (existT _ Σ (existT _ wfΣ (existT _ _ (existT _ _ (existT _ _ H14)))))).
   simpl in IH.
   forward IH. constructor 1. simpl; omega.
   apply IH.

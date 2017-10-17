@@ -163,6 +163,82 @@ Proof.
   constructor. now auto with arith.
 Qed.
 
+Lemma typing_ind_env :
+  forall (P : global_context -> context -> term -> term -> Set),
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (n : nat) (isdecl : n < #|Γ|),
+        P Σ Γ (tRel n)
+          (lift0 (S n) (decl_type (safe_nth Γ (exist (fun n0 : nat => n0 < #|Γ|) n isdecl))))) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (s : sort), P Σ Γ (tSort s) (tSort (succ_sort s))) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (c : term) (k : cast_kind) (t : term) (s : sort),
+        Σ;;; Γ |-- t : tSort s -> P Σ Γ t (tSort s) -> Σ;;; Γ |-- c : t -> P Σ Γ c t -> P Σ Γ (tCast c k t) t) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (n : name) (t b : term) (s1 s2 : sort),
+        Σ;;; Γ |-- t : tSort s1 ->
+        P Σ Γ t (tSort s1) ->
+        Σ;;; Γ,, vass n t |-- b : tSort s2 ->
+        P Σ (Γ,, vass n t) b (tSort s2) -> P Σ Γ (tProd n t b) (tSort (max_sort s1 s2))) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (n n' : name) (t b : term) (s1 : sort) (bty : term),
+        Σ;;; Γ |-- t : tSort s1 ->
+        P Σ Γ t (tSort s1) ->
+        Σ;;; Γ,, vass n t |-- b : bty -> P Σ (Γ,, vass n t) b bty -> P Σ Γ (tLambda n t b) (tProd n' t bty)) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (n : name) (b b_ty b' : term) (s1 : sort) (b'_ty : term),
+        Σ;;; Γ |-- b_ty : tSort s1 ->
+        P Σ Γ b_ty (tSort s1) ->
+        Σ;;; Γ |-- b : b_ty ->
+        P Σ Γ b b_ty ->
+        Σ;;; Γ,, vdef n b b_ty |-- b' : b'_ty ->
+        P Σ (Γ,, vdef n b b_ty) b' b'_ty -> P Σ Γ (tLetIn n b b_ty b') (tLetIn n b b_ty b'_ty)) ->
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (t : term) (l : list term) (t_ty t' : term),
+        Σ;;; Γ |-- t : t_ty -> P Σ Γ t t_ty -> typing_spine Σ Γ t_ty l t' -> P Σ Γ (tApp t l) t') ->
+
+    (forall Σ (wfΣ : wf Σ) (Γ : context) (cst : ident) (decl : constant_decl),
+        declared_constant Σ cst decl ->
+        Forall_decls_typing (fun Σ t ty => P Σ [] t ty) Σ ->
+        P Σ Γ (tConst cst) (cst_type decl)) ->
+
+        (forall Σ (wfΣ : wf Σ) (Γ : context) (ind : inductive) (decl : inductive_body),
+        declared_inductive Σ ind decl -> P Σ Γ (tInd ind) (ind_type decl)) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (ind : inductive) (i : nat) (decl : ident * term * nat)
+          (isdecl : declared_constructor Σ (ind, i) decl),
+        P Σ Γ (tConstruct ind i) (type_of_constructor Σ (ind, i) decl isdecl)) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (ind : inductive) (npar : nat) (p c : term) (brs : list (nat * term))
+          (args : list term) (decl : minductive_decl),
+        declared_minductive Σ (inductive_mind ind) decl ->
+        forall decl' : inductive_body,
+        declared_inductive Σ ind decl' ->
+        ind_npars decl = npar ->
+        let pars := firstn npar args in
+        forall (pty : term) (s : sort) (btys : list (nat * term)),
+        types_of_case ind pars p decl' = Some (pty, s, btys) ->
+        Exists (fun sf : sort_family => allowed_elim s sf = true) (ind_kelim decl') ->
+        Σ;;; Γ |-- p : pty ->
+        P Σ Γ p pty ->
+        Σ;;; Γ |-- c : mktApp (tInd ind) args ->
+        P Σ Γ c (mktApp (tInd ind) args) ->
+        Forall2 (fun x y : nat * term => fst x = fst y /\ squash (Σ;;; Γ |-- snd x : snd y)) brs btys ->
+        P Σ Γ (tCase (ind, npar) p c brs) (tApp p (skipn npar args ++ [c]))) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (p : projection) (c : term) (decl : ident * term),
+        declared_projection Σ p decl ->
+        forall args : list term,
+        Σ;;; Γ |-- c : mktApp (tInd (fst (fst p))) args ->
+        P Σ Γ c (mktApp (tInd (fst (fst p))) args) ->
+        let ty := snd decl in P Σ Γ (tProj p c) (substl (c :: rev args) ty)) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (mfix : list (def term)) (n : nat) (isdecl : n < #|mfix|),
+        let ty := dtype (safe_nth mfix (exist (fun n0 : nat => n0 < #|mfix|) n isdecl)) in
+        P Σ Γ (tFix mfix n) ty) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (mfix : list (def term)) (n : nat) (isdecl : n < #|mfix|),
+        let ty := dtype (safe_nth mfix (exist (fun n0 : nat => n0 < #|mfix|) n isdecl)) in
+        P Σ Γ (tCoFix mfix n) ty) ->
+       (forall Σ (wfΣ : wf Σ) (Γ : context) (t A B : term) (s : sort),
+        Σ;;; Γ |-- t : A ->
+                       P Σ Γ t A -> Σ;;; Γ |-- B : tSort s -> P Σ Γ B (tSort s) -> Σ;;; Γ |-- A <= B -> P Σ Γ t B) ->
+
+       forall Σ (ψfΣ : wf Σ) Γ t T, Σ;;; Γ |-- t : T -> P Σ Γ t T.
+Proof.
+  intros.
+  eapply typing_ind_env; eauto.
+Qed.
+  
+
 Lemma weakening_rec Σ Γ Γ' Γ'' :
   type_global_env Σ -> type_local_env Σ (Γ ,,, Γ') ->
   type_local_env Σ (Γ ,,, Γ'' ,,, lift_context #|Γ''| 0 Γ') ->
@@ -170,8 +246,9 @@ Lemma weakening_rec Σ Γ Γ' Γ'' :
     Σ ;;; Γ ,,, Γ'' ,,, lift_context #|Γ''| 0 Γ' |--
     lift #|Γ''| #|Γ'| t : lift #|Γ''| #|Γ'| T).
 Proof.
-  intros HΣ HΓΓ' HΓ'' * H. revert Γ'' HΓ''. 
-  dependent induction H; intros Γ'' HΓ''; simpl in *; try solve [econstructor; eauto].
+  intros HΣ HΓΓ' HΓ'' * H. revert Γ'' HΓ''.
+  do_depind ltac:(fun hyp => elim hyp using typing_ind_env; clear hyp; clear) H;
+    try intros Γ'' HΓ''; simpl in *; try solve [econstructor; eauto].
 
   - elim (leb_spec_Set); intros Hn.
     + destruct (weaken_safe_nth_ge _ _ _ isdecl Γ'' Hn) as [isdecl' ->].
@@ -188,41 +265,57 @@ Proof.
 
   - econstructor; auto.
     simpl.
-    specialize (IHtyping2 Γ (Γ' ,, vass n t) HΣ).
-    forward IHtyping2. constructor; simpl; auto. red. now exists s1.
-    specialize (IHtyping2 eq_refl Γ'').
-    forward IHtyping2. rewrite lift_context_snoc. constructor. simpl; auto.
-    exists s1. simpl. rewrite Nat.add_0_r. eapply IHtyping1; auto. 
-    rewrite lift_context_snoc, plus_0_r in IHtyping2.
-    eapply IHtyping2.
+    specialize (x1 Γ Γ' wfΣ HΓΓ' eq_refl).
+    specialize (x Γ (Γ' ,, vass n t) wfΣ).
+    forward x. constructor; simpl; auto. red. now exists s1.
+    specialize (x eq_refl Γ'').
+    forward x. rewrite lift_context_snoc. simpl. constructor. simpl; auto.
+    exists s1. simpl. rewrite Nat.add_0_r. eapply x1; auto. 
+    rewrite lift_context_snoc, plus_0_r in x.
+    eapply x.
 
   - econstructor; auto.
     simpl.
-    specialize (IHtyping2 Γ (Γ' ,, vass n t) HΣ).
-    forward IHtyping2. constructor; simpl; auto. red. now exists s1.
-    specialize (IHtyping2 eq_refl Γ'').
-    forward IHtyping2. rewrite lift_context_snoc. constructor. simpl; auto.
-    exists s1. simpl. rewrite Nat.add_0_r. eapply IHtyping1; auto. 
-    rewrite lift_context_snoc, plus_0_r in IHtyping2.
-    eapply IHtyping2.
+    specialize (x1 Γ Γ' wfΣ HΓΓ' eq_refl).
+    specialize (x Γ (Γ' ,, vass n t) wfΣ).
+    forward x. constructor; simpl; auto. red. now exists s1.
+    specialize (x eq_refl Γ'').
+    forward x. rewrite lift_context_snoc. simpl. constructor. simpl; auto.
+    exists s1. simpl. rewrite Nat.add_0_r. eapply x1; auto. 
+    rewrite lift_context_snoc, plus_0_r in x.
+    eapply x.
 
   - econstructor; auto.
     simpl.
-    specialize (IHtyping3 Γ (Γ' ,, vdef n b b_ty) HΣ).
-    forward IHtyping3. constructor; simpl; auto. 
-    specialize (IHtyping3 eq_refl Γ'').
-    forward IHtyping3. rewrite lift_context_snoc, Nat.add_0_r.
-    simpl.
-    constructor. simpl; auto.
-    red. simpl. eapply IHtyping2; auto. simpl.
-    rewrite lift_context_snoc, plus_0_r in IHtyping3.
-    eapply IHtyping3.
+    specialize (x1 Γ Γ' wfΣ HΓΓ' eq_refl).
+    specialize (x Γ (Γ' ,, vdef n b b_ty) wfΣ).
+    forward x. constructor; simpl; auto. 
+    specialize (x eq_refl Γ'').
+    rewrite lift_context_snoc, plus_0_r in x.
+    forward x. simpl. constructor. simpl; auto.
+    red. simpl. now eapply (x3 Γ Γ' wfΣ HΓΓ' eq_refl). 
+    eapply x. 
 
   - econstructor; auto.
     simpl.
     admit.
 
-  - admit.
+  - red in x0.
+    Lemma Forall_decls_typing Σ (wfΣ : wf Σ) P cst decl : Forall_decls_typing P Σ -> lookup_env Σ cst = Some decl ->
+      { Σ' : _ & (Forall_decls_typing P Σ' *
+                  on_decl_typing (fun t T => P Σ' t T) decl)%type }.
+    Proof.
+      induction 1; intros [=].
+      destruct ident_eq in *. injection H1 as ->.
+      eexists. split; eauto. revert o. inversion wfΣ. subst d Σ0.
+      revert H4.
+      destruct decl; simpl. unfold type_constant_decl. destruct cst_body. auto.
+      unfold isType. intros [s Hs]. intros. destruct o.  exists x.
+      inversion wfΣ. subst. red in H4. red in H4.
+      red in o.
+      
+
+    
   - admit.
   - admit.
 
