@@ -1,12 +1,23 @@
 (*i camlp4deps: "parsing/grammar.cma" i*)
 (*i camlp4use: "pa_extend.cmp" i*)
 
-open Ltac_plugin
+(* open Ltac_plugin *)
 
 let contrib_name = "template-coq"
 open Feedback
 
 
+module EConstr = struct
+  type t = Constr.t
+  let to_constr _ x = x
+  let of_constr x = x
+end
+
+let user_err ?(loc=Loc.ghost) ~hdr msg =
+  CErrors.user_err_loc (loc, hdr, msg)
+
+let tag_loc x = (Loc.ghost, x)
+  
 let toDecl (old: Names.name * ((Constr.constr) option) * Constr.constr) : Context.Rel.Declaration.t =
   let (name,value,typ) = old in 
   match value with
@@ -20,7 +31,8 @@ let fromDecl (n: Context.Rel.Declaration.t) :  Names.name * ((Constr.constr) opt
 
 let cast_prop = ref (false)
 let _ = Goptions.declare_bool_option {
-  Goptions.optdepr = false;
+            Goptions.optdepr = false;
+            Goptions.optsync = true;
   Goptions.optname = "Casting of propositions in template-coq";
   Goptions.optkey = ["Template";"Cast";"Propositions"];
   Goptions.optread = (fun () -> !cast_prop);
@@ -71,12 +83,13 @@ struct
   open Pp (* this adds the ++ to the current scope *)
 
   let not_supported trm =
-    (* Feedback.msg_error (str "Not Supported:" ++ spc () ++ Printer.pr_constr trm) ; *)
-    CErrors.user_err (str "Not Supported:" ++ spc () ++ Printer.pr_constr trm)
-    (* raise (NotSupported (trm, "no reason")) *)
+    Feedback.msg_error (str "Not Supported:" ++ spc () ++ Printer.pr_constr trm);
+    (* CErrors.user_err (str "Not Supported:" ++ spc () ++ Printer.pr_constr trm) *)
+    raise (NotSupported (trm, "no reason"))
 
   let not_supported_verb trm rs =
-    CErrors.user_err (str "Not Supported raised at " ++ str rs ++ str ":" ++ spc () ++ Printer.pr_constr trm)
+    raise (NotSupported (trm, "bad term"))
+    (* CErrors.user_err (str "Not Supported raised at " ++ str rs ++ str ":" ++ spc () ++ Printer.pr_constr trm) *)
     
   let bad_term trm =
     raise (NotSupported (trm, "bad term"))
@@ -324,7 +337,7 @@ let castSetProp (sf:Term.sorts) t =
 
 let noteTypeAsCast t typ =
   Term.mkApp (tCast, [| t ; kCast ; typ |])
-
+               
 let getSort env (t:Term.constr) =
   Retyping.get_sort_of env Evd.empty (EConstr.of_constr t)
 
@@ -775,7 +788,7 @@ let reduce_all env (evm,def) =
   let strict_universe_declarations = ref true
   let is_strict_universe_declarations () = !strict_universe_declarations
   let get_universe evd (loc, s) =
-        let names, _ = Global.global_universe_names () in
+        let names, _ = Universes.global_universe_names () in
         if CString.string_contains ~where:s ~what:"." then
           match List.rev (CString.split '.' s) with
           | [] -> CErrors.anomaly (str"Invalid universe name " ++ str s ++ str".")
@@ -796,7 +809,7 @@ let reduce_all env (evm,def) =
 	      let id = try Names.Id.of_string s with _ -> raise Not_found in
               evd, snd (Names.Idmap.find id names)
 	    with Not_found ->
-	      CErrors.user_err ?loc ~hdr:"interp_universe_level_name"
+	      user_err ?loc ~hdr:"interp_universe_level_name"
 		            (Pp.(str "Undeclared universe: " ++ str s))
   (* end of code from Pretyping *)
                  
@@ -1133,20 +1146,23 @@ DECLARE PLUGIN "template_plugin"
 
 (** Stolen from CoqPluginUtils **)
 (** Calling Ltac **)
-let ltac_call tac (args:Tacexpr.glob_tactic_arg list) =
-  Tacexpr.TacArg(Loc.tag @@ Tacexpr.TacCall (Loc.tag (Misctypes.ArgArg(Loc.tag @@ Lazy.force tac),args)))
-
 (* let ltac_call tac (args:Tacexpr.glob_tactic_arg list) = *)
-(*   Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgArg(Loc.ghost, Lazy.force tac),args)) *)
+(*   Tacexpr.TacArg(tag_loc @@ Tacexpr.TacCall *)
+(*                               (tag_loc (Misctypes.ArgArg(tag_loc @@ Lazy.force tac),args))) *)
+
+let ltac_call tac (args:Tacexpr.glob_tactic_arg list) =
+  Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgArg(Loc.ghost, Lazy.force tac),args))
 
 (* Calling a locally bound tactic *)
-(* let ltac_lcall tac args = *)
-(*   Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgVar(Loc.ghost, Names.id_of_string tac),args)) *)
 let ltac_lcall tac args =
-  Tacexpr.TacArg(Loc.tag @@ Tacexpr.TacCall (Loc.tag (Misctypes.ArgVar(Loc.tag @@ Names.Id.of_string tac),args)))
+  Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgVar(Loc.ghost, Names.id_of_string tac),args))
+(* let ltac_lcall tac args = *)
+(*   Tacexpr.TacArg(tag_loc @@ *)
+(*                    Tacexpr.TacCall (tag_loc *)
+(*                                       (Misctypes.ArgVar(tag_loc @@ Names.Id.of_string tac),args))) *)
 
-(* let ltac_letin (x, e1) e2 = *)
-(*   Tacexpr.TacLetIn(false,[(Loc.ghost,Names.id_of_string x),e1],e2) *)
+let ltac_letin (x, e1) e2 =
+  Tacexpr.TacLetIn(false,[(Loc.ghost,Names.id_of_string x),e1],e2)
 
 open Names
 open Tacexpr
@@ -1157,7 +1173,7 @@ open Misctypes
 let ltac_apply (f : Value.t) (args: Tacinterp.Value.t list) =
   let fold arg (i, vars, lfun) =
     let id = Names.Id.of_string ("x" ^ string_of_int i) in
-    let x = Reference (ArgVar (Loc.tag id)) in
+    let x = Reference (ArgVar (tag_loc id)) in
     (succ i, x :: vars, Id.Map.add id arg lfun)
   in
   let (_, args, lfun) = List.fold_right fold args (0, [], Id.Map.empty) in
@@ -1185,21 +1201,22 @@ let check_inside_section () =
   if Lib.sections_are_opened () then
     (** In trunk this seems to be moved to Errors **)
     (* For Coq 8.7: CErrors.user_err ~hdr:"Quote" (Pp.str "You can not quote within a section.") *)
-    CErrors.user_err ~hdr:"Quote" (Pp.str "You can not quote within a section.")
+    user_err ~hdr:"Quote" (Pp.str "You can not quote within a section.")
   else ()
 
 open Stdarg
-open Tacarg
+open Extraargs
+open Constrarg
 open Proofview.Notations
 open Pp
-
+   
 TACTIC EXTEND get_goal
     | [ "quote_term" constr(c) tactic(tac) ] ->
       [ (** quote the given term, pass the result to t **)
-  Proofview.Goal.nf_enter begin fun gl ->
+        Proofview.Goal.nf_enter begin { enter = fun gl ->
           let env = Proofview.Goal.env gl in
 	  let c = TermReify.quote_term env (EConstr.to_constr (Proofview.Goal.sigma gl) c) in
-	  ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c])
+	  ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c]) }
   end ]
 (*
     | [ "quote_goal" ] ->
@@ -1212,12 +1229,12 @@ END;;
 
 TACTIC EXTEND denote_term
     | [ "denote_term" constr(c) tactic(tac) ] ->
-      [ Proofview.Goal.nf_enter begin fun gl ->
+      [ Proofview.Goal.nf_enter begin { enter = fun gl ->
          let (evm,env) = Lemmas.get_current_context() in
          let c = TermReify.denote_term (EConstr.to_constr (Proofview.Goal.sigma gl) c) in
          let def' = Constrextern.extern_constr true env evm c in
          let def = Constrintern.interp_constr env evm def' in
-	 ltac_apply tac (List.map to_ltac_val [EConstr.of_constr (fst def)])
+	 ltac_apply tac (List.map to_ltac_val [EConstr.of_constr (fst def)]) }
       end ]
 END;;
 
