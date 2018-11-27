@@ -184,3 +184,4 @@ checker/src/wf.mli
 /checker/src/orders.ml
 /checker/src/orders.mli
 /checker/src/ordersTac.ml
+/template-coq/src/g_template_coq.ml
