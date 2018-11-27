@@ -1,21 +1,17 @@
-(*i camlp4deps: "parsing/grammar.cma" i*)
-(*i camlp4use: "pa_extend.cmp" i*)
+(*i camlp4deps: "grammar/grammar.cma" i*)
+
+DECLARE PLUGIN "template_coq"
+
+{
 
 open Ltac_plugin
 open Entries
 open Names
 
-
-DECLARE PLUGIN "template_coq"
-
 (** Calling Ltac **)
 
 let ltac_lcall tac args =
-  let (location, name) = Loc.tag (Names.Id.of_string tac)
-    (* Loc.tag @@ Names.Id.of_string tac *)
-  in
-  Tacexpr.TacArg(Loc.tag @@ Tacexpr.TacCall
-                              (Loc.tag (Locus.ArgVar (CAst.make ?loc:location name),args)))
+  Tacexpr.TacArg (CAst.(make @@ Tacexpr.TacCall (make (tac, args))))
 
 open Tacexpr
 open Tacinterp
@@ -45,21 +41,22 @@ let ltac_apply (f : Value.t) (args: Tacinterp.Value.t list) =
 
 let to_ltac_val c = Tacinterp.Value.of_constr c
 
+}
 
 TACTIC EXTEND get_goal
     | [ "quote_term" constr(c) tactic(tac) ] ->
-      [ (** quote the given term, pass the result to t **)
+       { (** quote the given term, pass the result to t **)
         Proofview.Goal.nf_enter begin fun gl ->
           let env = Proofview.Goal.env gl in
           let c = EConstr.to_constr ~abort_on_undefined_evars:false (Proofview.Goal.sigma gl) c in
 	  let c = Constr_quoter.TermReify.quote_term env c in
 	  ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c])
-  end ]
-END;;
+  end }
+END
 
 TACTIC EXTEND denote_term
     | [ "denote_term" constr(c) tactic(tac) ] ->
-      [ Proofview.Goal.enter (begin fun gl ->
+       { Proofview.Goal.enter (begin fun gl ->
          let env = Proofview.Goal.env gl in
          let evm = Proofview.Goal.sigma gl in
          let evdref = ref evm in
@@ -69,23 +66,23 @@ TACTIC EXTEND denote_term
          let def = Constrintern.interp_constr env !evdref def' in
          Proofview.tclTHEN (Proofview.Unsafe.tclEVARS !evdref)
 	   (ltac_apply tac (List.map to_ltac_val [fst def]))
-      end) ]
-END;;
+      end) }
+END
 
 
 VERNAC COMMAND EXTEND Make_vernac CLASSIFIED AS SIDEFF
     | [ "Quote" "Definition" ident(name) ":=" constr(def) ] ->
-      [ let (evm,env) = Pfedit.get_current_context () in
+       { let (evm,env) = Pfedit.get_current_context () in
 	let def,uctx = Constrintern.interp_constr env evm def in
 	let trm = Constr_quoter.TermReify.quote_term env (EConstr.to_constr evm def) in
 	ignore(Declare.declare_definition
                  ~kind:Decl_kinds.Definition name
-                 (trm, Monomorphic_const_entry (UState.context_set uctx))) ]
-END;;
+                 (trm, Monomorphic_const_entry (UState.context_set uctx))) }
+END
 
 VERNAC COMMAND EXTEND Make_vernac_reduce CLASSIFIED AS SIDEFF
     | [ "Quote" "Definition" ident(name) ":=" "Eval" red_expr(rd) "in" constr(def) ] ->
-      [ let (evm,env) = Pfedit.get_current_context () in
+      { let (evm,env) = Pfedit.get_current_context () in
 	let def, uctx = Constrintern.interp_constr env evm def in
         let evm = Evd.from_ctx uctx in
         let (evm,rd) = Tacinterp.interp_redexp env evm rd in
@@ -94,22 +91,22 @@ VERNAC COMMAND EXTEND Make_vernac_reduce CLASSIFIED AS SIDEFF
 	ignore(Declare.declare_definition
                  ~kind:Decl_kinds.Definition
                  name
-                 (trm, Monomorphic_const_entry (Evd.universe_context_set evm))) ]
-END;;
+                 (trm, Monomorphic_const_entry (Evd.universe_context_set evm))) }
+END
 
 VERNAC COMMAND EXTEND Make_recursive CLASSIFIED AS SIDEFF
     | [ "Quote" "Recursively" "Definition" ident(name) ":=" constr(def) ] ->
-      [ let (evm,env) = Pfedit.get_current_context () in
+       { let (evm,env) = Pfedit.get_current_context () in
 	let def, uctx = Constrintern.interp_constr env evm def in
 	let trm = Constr_quoter.TermReify.quote_term_rec env (EConstr.to_constr evm def) in
 	ignore(Declare.declare_definition
 	  ~kind:Decl_kinds.Definition name
-	  (trm, Monomorphic_const_entry (UState.context_set uctx))) ]
-END;;
+          (trm, Monomorphic_const_entry (UState.context_set uctx))) }
+END
 
 VERNAC COMMAND EXTEND Unquote_vernac CLASSIFIED AS SIDEFF
     | [ "Make" "Definition" ident(name) ":=" constr(def) ] ->
-      [ let (evm, env) = Pfedit.get_current_context () in
+       { let (evm, env) = Pfedit.get_current_context () in
 	let (trm, uctx) = Constrintern.interp_constr env evm def in
         let evdref = ref (Evd.from_ctx uctx) in
 	let trm = Denote.denote_term evdref (EConstr.to_constr evm trm) in
@@ -117,12 +114,12 @@ VERNAC COMMAND EXTEND Unquote_vernac CLASSIFIED AS SIDEFF
                   ~kind:Decl_kinds.Definition
                   name
                   (trm, Monomorphic_const_entry (Evd.universe_context_set !evdref)) in
-        () ]
-END;;
+        () }
+END
 
 VERNAC COMMAND EXTEND Unquote_vernac_red CLASSIFIED AS SIDEFF
     | [ "Make" "Definition" ident(name) ":=" "Eval" red_expr(rd) "in" constr(def) ] ->
-      [ let (evm, env) = Pfedit.get_current_context () in
+       { let (evm, env) = Pfedit.get_current_context () in
 	let (trm, uctx) = Constrintern.interp_constr env evm def in
         let evm = Evd.from_ctx uctx in
         let (evm,rd) = Tacinterp.interp_redexp env evm rd in
@@ -131,27 +128,27 @@ VERNAC COMMAND EXTEND Unquote_vernac_red CLASSIFIED AS SIDEFF
         let trm = Denote.denote_term evdref trm in
 	let _ = Declare.declare_definition ~kind:Decl_kinds.Definition name
                   (trm, Monomorphic_const_entry (Evd.universe_context_set !evdref)) in
-        () ]
-END;;
+        () }
+END
 
 VERNAC COMMAND EXTEND Unquote_inductive CLASSIFIED AS SIDEFF
     | [ "Make" "Inductive" constr(def) ] ->
-      [ let (evm,env) = Pfedit.get_current_context () in
-	let (body,uctx) = Constrintern.interp_constr env evm def in
-        Denote.declare_inductive env evm (EConstr.to_constr evm body) ]
-END;;
+       { let (evm,env) = Pfedit.get_current_context () in
+         let (body,uctx) = Constrintern.interp_constr env evm def in
+         Denote.declare_inductive env evm (EConstr.to_constr evm body) }
+END
 
 VERNAC COMMAND EXTEND Run_program CLASSIFIED AS SIDEFF
-    | [ "Run" "TemplateProgram" constr(def) ] ->
-      [ let (evm, env) = Pfedit.get_current_context () in
-        let (def, _) = Constrintern.interp_constr env evm def in
-        (* todo : uctx ? *)
-        Denote.run_template_program_rec (fun _ -> ()) (evm, (EConstr.to_constr evm def)) ]
-END;;
+| #[ poly = polymorphic ] [ "Run" "TemplateProgram" constr(def) ] ->
+   { let (evm, env) = Pfedit.get_current_context () in
+     let (def, _) = Constrintern.interp_constr env evm def in
+     (* todo : uctx ? *)
+     Denote.run_template_program_rec ~poly (fun _ -> ()) (evm, (EConstr.to_constr evm def)) }
+END
 
 TACTIC EXTEND run_program
-    | [ "run_template_program" constr(c) tactic(tac) ] ->
-      [ Proofview.Goal.enter (begin fun gl ->
+| [ "run_template_program" constr(c) tactic(tac) ] ->
+   { Proofview.Goal.enter (begin fun gl ->
          let evm = Proofview.Goal.sigma gl in
          let ret = ref None in
          Denote.run_template_program_rec ~intactic:true (fun (evm, t) -> ret := Some t) (evm, EConstr.to_constr evm c);
@@ -159,14 +156,14 @@ TACTIC EXTEND run_program
            Some c ->
            ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c])
          | None -> Proofview.tclUNIT ()
-       end) ]
-END;;
+       end) }
+END
 
 VERNAC COMMAND EXTEND Make_tests CLASSIFIED AS QUERY
     | [ "Test" "Quote" constr(c) ] ->
-      [ let (evm,env) = Pfedit.get_current_context () in
+      { let (evm,env) = Pfedit.get_current_context () in
 	let c = Constrintern.interp_constr env evm c in
 	let result = Constr_quoter.TermReify.quote_term env (EConstr.to_constr evm (fst c)) in
         Feedback.msg_notice (Quoter.pr_constr result) ;
-	() ]
-END;;
+        () }
+END

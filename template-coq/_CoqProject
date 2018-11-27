@@ -8,7 +8,7 @@ src/constr_quoter.ml
 # src/denote.mli
 src/denote.ml
 # src/g_template_coq.mli
-src/g_template_coq.ml4
+src/g_template_coq.mlg
 src/template_coq.mlpack
 
 theories/utils.v
