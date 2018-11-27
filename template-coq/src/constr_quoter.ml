@@ -8,7 +8,7 @@ open Quoter
 let contrib_name = "template-coq"
 
 let gen_constant_in_modules locstr dirs s =
-  UnivGen.constr_of_global (Coqlib.gen_reference_in_modules locstr dirs s)
+  UnivGen.constr_of_monomorphic_global (Coqlib.gen_reference_in_modules locstr dirs s)
 
 (** The reifier to Coq values *)
 module TemplateCoqQuoter =
@@ -34,7 +34,6 @@ struct
   type quoted_univ_context = Constr.t (* of type univ.universe_context *)
   type quoted_inductive_universes = Constr.t (* of type univ.universe_context *)
 
-  type quoted_mind_params = Constr.t (* of type list (Ast.ident * list (ident * local_entry)local_entry) *)
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
   type quoted_definition_entry = t * t option * quoted_univ_context
   type quoted_mind_entry = Constr.t (* of type Ast.mutual_inductive_entry *)
@@ -112,6 +111,7 @@ struct
   let tIndTy = r_reify "inductive"
   let tmkInd = r_reify "mkInd"
   let tsort_family = r_reify "sort_family"
+  let tmkdecl = r_reify "mkdecl"
   let (tTerm,tRel,tVar,tMeta,tEvar,tSort,tCast,tProd,
        tLambda,tLetIn,tApp,tCase,tFix,tConstructor,tConst,tInd,tCoFix,tProj) =
     (r_reify "term", r_reify "tRel", r_reify "tVar", r_reify "tMeta", r_reify "tEvar",
@@ -130,8 +130,8 @@ struct
   let cPolymorphic_ctx = resolve_symbol pkg_univ "Polymorphic_ctx"
   let tUContextmake = resolve_symbol (ext_pkg_univ "UContext") "make"
   (* let tConstraintSetempty = resolve_symbol (ext_pkg_univ "ConstraintSet") "empty" *)
-  let tConstraintSetempty = UnivGen.constr_of_global (Coqlib.find_reference "template coq bug" (ext_pkg_univ "ConstraintSet") "empty")
-  let tConstraintSetadd = UnivGen.constr_of_global (Coqlib.find_reference "template coq bug" (ext_pkg_univ "ConstraintSet") "add")
+  let tConstraintSetempty = UnivGen.constr_of_monomorphic_global (Coqlib.find_reference "template coq bug" (ext_pkg_univ "ConstraintSet") "empty")
+  let tConstraintSetadd = UnivGen.constr_of_monomorphic_global (Coqlib.find_reference "template coq bug" (ext_pkg_univ "ConstraintSet") "add")
   let tmake_univ_constraint = resolve_symbol pkg_univ "make_univ_constraint"
   let tinit_graph = resolve_symbol pkg_ugraph "init_graph"
   let tadd_global_constraints = resolve_symbol pkg_ugraph  "add_global_constraints"
@@ -322,8 +322,8 @@ struct
   let quote_inductive_universes uctx =
     match uctx with
     | Monomorphic_ind_entry uctx -> quote_univ_context (Univ.ContextSet.to_context uctx)
-    | Polymorphic_ind_entry uctx -> quote_abstract_univ_context_aux uctx
-    | Cumulative_ind_entry info ->
+    | Polymorphic_ind_entry (na, uctx) -> quote_abstract_univ_context_aux uctx
+    | Cumulative_ind_entry (na, info) ->
       quote_abstract_univ_context_aux (CumulativityInfo.univ_context info) (* FIXME lossy *)
 
   let quote_ugraph (g : UGraph.t) =

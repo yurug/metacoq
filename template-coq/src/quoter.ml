@@ -121,7 +121,6 @@ module type Quoter = sig
   type quoted_univ_context
   type quoted_inductive_universes
 
-  type quoted_mind_params
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
   type quoted_definition_entry = t * t option * quoted_univ_context
   type quoted_mind_entry
@@ -158,10 +157,9 @@ module type Quoter = sig
   val quote_abstract_univ_context : Univ.AUContext.t -> quoted_univ_context
   val quote_inductive_universes : Entries.inductive_universes -> quoted_inductive_universes
 
-  val quote_mind_params : (quoted_ident * (t,t) sum) list -> quoted_mind_params
   val quote_mind_finiteness : Declarations.recursivity_kind -> quoted_mind_finiteness
   val quote_mutual_inductive_entry :
-    quoted_mind_finiteness * quoted_mind_params * quoted_ind_entry list *
+    quoted_mind_finiteness * quoted_context * quoted_ind_entry list *
     quoted_inductive_universes ->
     quoted_mind_entry
 
@@ -462,15 +460,20 @@ struct
       let mind = Q.mk_mutual_inductive_body nparams paramsctx bodies uctx in
       Q.mk_inductive_decl ref_name mind, acc
     in ((fun acc env -> quote_term acc (false, env)),
-        (fun acc env -> quote_minductive_type acc (false, env)))
+        (fun acc env -> quote_minductive_type acc (false, env)),
+        (fun acc env -> quote_rel_context acc (false, env)))
 
   let quote_term env trm =
-    let (fn,_) = quote_term_remember (fun _ () -> ()) (fun _ () -> ()) in
+    let (fn,_,_) = quote_term_remember (fun _ () -> ()) (fun _ () -> ()) in
     fst (fn () env trm)
 
   let quote_mind_decl env trm =
-    let (_,fn) = quote_term_remember (fun _ () -> ()) (fun _ () -> ()) in
+    let (_,fn,_) = quote_term_remember (fun _ () -> ()) (fun _ () -> ()) in
     fst (fn () env trm)
+
+  let quote_rel_context env ctx =
+    let (_,_,fn) = quote_term_remember (fun _ () -> ()) (fun _ () -> ()) in
+    fst (fn () env ctx)
 
   type defType =
     Ind of Names.inductive
@@ -540,7 +543,7 @@ struct
     let (quote_rem,quote_typ) =
       let a = ref (fun _ _ _ -> assert false) in
       let b = ref (fun _ _ _ -> assert false) in
-      let (x,y) =
+      let (x,y,_) =
 	quote_term_remember (fun x () -> add !a !b (Const x) ())
 	                    (fun y () -> add !a !b (Ind y) ())
       in
@@ -560,32 +563,12 @@ struct
     let constypes = List.map (quote_term envC) (mi.mind_entry_lc) in
     (iname, arity, templatePoly, consnames, constypes)
 
-  let process_local_entry
-        (f: 'a -> Constr.t option (* body *) -> Constr.t (* type *) -> Names.Id.t -> Environ.env -> 'a)
-        ((env,a):(Environ.env*'a))
-        ((n,le):(Names.Id.t * Entries.local_entry))
-      :  (Environ.env * 'a) =
-    match le with
-    | Entries.LocalAssumEntry t -> (Environ.push_rel (toDecl (Names.Name n,None,t)) env, f a None t n env)
-    | Entries.LocalDefEntry b ->
-       let evm = Evd.from_env env in
-       let typ = EConstr.to_constr evm (Retyping.get_type_of env evm (EConstr.of_constr b)) in
-       (Environ.push_rel (toDecl (Names.Name n, Some b, typ)) env, f a (Some b) typ n env)
+  let quote_mind_params env (params: Constr.rel_context) =
+    (env, quote_rel_context env params)
 
-  let quote_mind_params env (params:(Names.Id.t * Entries.local_entry) list) =
-    let f lr ob t n env =
-      match ob with
-      | Some b -> (Q.quote_ident n, Left (quote_term env b))::lr
-      | None ->
-         let t' = quote_term env t in
-         (Q.quote_ident n, Right t')::lr in
-    let (env, params) = List.fold_left (process_local_entry f) (env,[]) (List.rev params) in
-    (env, Q.quote_mind_params (List.rev params))
-
-  let mind_params_as_types ((env,t):Environ.env*Constr.t) (params:(Names.Id.t * Entries.local_entry) list) :
+  let mind_params_as_types ((env,t):Environ.env*Constr.t) params :
         Environ.env*Constr.t =
-    List.fold_left (process_local_entry (fun tr ob typ n env -> Term.mkProd_or_LetIn (toDecl (Names.Name n,ob,typ)) tr)) (env,t)
-      (List.rev params)
+    (env, Term.it_mkProd_or_LetIn t params)
 
   (* CHANGE: this is the only way (ugly) I found to construct [absrt_info] with empty fields,
 since  [absrt_info] is a private type *)
@@ -603,11 +586,11 @@ since  [absrt_info] is a private type *)
         t.mind_entry_inds in
     (* env for quoting constructors of inductives. First push inductices, then params *)
     let envC = List.fold_left (fun env p -> Environ.push_rel (toDecl (Names.Name (fst p), None, snd p)) env) env (one_arities) in
-    let (envC,_) = List.fold_left (process_local_entry (fun _ _ _ _ _ -> ())) (envC,()) (List.rev (t.mind_entry_params)) in
+    let envC = Environ.push_rel_context t.mind_entry_params envC in
     (* env for quoting arities of inductives -- just push the params *)
-    let (envA,_) = List.fold_left (process_local_entry (fun _ _ _ _ _ -> ())) (env,()) (List.rev (t.mind_entry_params)) in
+    let envA = Environ.push_rel_context t.mind_entry_params env in
     let is = List.map (quote_one_ind envA envC) t.mind_entry_inds in
-   let uctx = Q.quote_inductive_universes t.mind_entry_universes in
+    let uctx = Q.quote_inductive_universes t.mind_entry_universes in
     Q.quote_mutual_inductive_entry (mf, mp, is, uctx)
 
   let quote_entry_aux bypass env evm (name:string) =

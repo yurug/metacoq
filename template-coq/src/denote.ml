@@ -219,7 +219,7 @@ let unquote_name trm =
 
 let get_level evd s =
   if CString.string_contains ~where:s ~what:"." then
-    match List.rev (CString.split '.' s) with
+    match List.rev (CString.split_on_char '.' s) with
     | [] -> CErrors.anomaly (str"Invalid universe name " ++ str s ++ str".")
     | n :: dp ->
        let num = int_of_string n in
@@ -336,7 +336,7 @@ let denote_term evdref (trm: Constr.t) : Constr.t =
        let s = (unquote_kn s) in
        (try
           match Nametab.locate s with
-          | Globnames.ConstRef c -> UnivGen.constr_of_global (Globnames.ConstRef c)
+          | Globnames.ConstRef c -> Constr.mkRef (Globnames.ConstRef c, (*FIXME*) Univ.Instance.empty)
           | Globnames.IndRef _ -> CErrors.user_err (str "the constant is an inductive. use tInd : "
                                                     ++  Pp.str (Libnames.string_of_qualid s))
           | Globnames.VarRef _ -> CErrors.user_err (str "the constant is a variable. use tVar : " ++ Pp.str (Libnames.string_of_qualid s))
@@ -406,13 +406,13 @@ let denote_reduction_strategy env evm (trm : quoted_reduction_strategy) : Redexp
 
 
 
-let denote_local_entry evdref trm =
-  let (h,args) = app_full trm [] in
-  match args with
-    x :: [] ->
-    if Constr.equal h tLocalDef then Entries.LocalDefEntry (denote_term evdref x)
-    else (if  Constr.equal h tLocalAssum then Entries.LocalAssumEntry (denote_term evdref x) else bad_term trm)
-  | _ -> bad_term trm
+(* let denote_local_entry evdref trm =
+ *   let (h,args) = app_full trm [] in
+ *   match args with
+ *     x :: [] ->
+ *     if Constr.equal h tLocalDef then Entries.LocalDefEntry (denote_term evdref x)
+ *     else (if  Constr.equal h tLocalAssum then Entries.LocalAssumEntry (denote_term evdref x) else bad_term trm)
+ *   | _ -> bad_term trm *)
 
 let denote_mind_entry_finite trm =
   let (h,args) = app_full trm [] in
@@ -455,7 +455,7 @@ let denote_universe_context (trm : Constr.t) : bool * UContext.t =
 let denote_mind_entry_universes trm =
   match denote_universe_context trm with
   | false, ctx -> Monomorphic_ind_entry (Univ.ContextSet.of_context ctx)
-  | true, ctx -> Polymorphic_ind_entry ctx
+  | true, ctx -> Polymorphic_ind_entry (Array.make (Instance.length (UContext.instance ctx)) Anonymous, ctx)
 
 (* let denote_inductive_first trm =
  *   let (h,args) = app_full trm [] in
@@ -475,6 +475,24 @@ let denote_mind_entry_universes trm =
  *     | _ -> assert false
  *   else
  *     bad_term_verb trm "non-constructor" *)
+
+let unquote_decl evdref trm =
+  let (h, args) = app_full trm [] in
+  if Constr.equal h tmkdecl then
+  match args with
+  | na :: b :: t :: [] ->
+     let na = unquote_name na in
+     let b = unquote_map_option (denote_term evdref) b in
+     let t = denote_term evdref t in
+     (match b with
+      | None -> Context.Rel.Declaration.LocalAssum (na, t)
+      | Some b -> Context.Rel.Declaration.LocalDef (na, b, t))
+  | _ -> bad_term trm
+  else bad_term trm
+
+let denote_context evdref trm =
+  let decls = from_coq_list trm in
+  List.map (unquote_decl evdref) decls
 
 let declare_inductive (env: Environ.env) (evm: Evd.evar_map) (body: Constr.t) : unit =
   let body = reduce_all env evm body in
@@ -497,8 +515,7 @@ let declare_inductive (env: Environ.env) (evm: Evd.evar_map) (body: Constr.t) : 
     {
       mind_entry_record = unquote_map_option (unquote_map_option (fun x -> Array.of_list (List.map unquote_ident (from_coq_list x)))) mr;
       mind_entry_finite = denote_mind_entry_finite mf; (* inductive *)
-      mind_entry_params = List.map (fun p -> let (l,r) = (from_coq_pair p) in (unquote_ident l, (denote_local_entry evdref r)))
-                                   (List.rev (from_coq_list mp));
+      mind_entry_params = denote_context evdref mp;
       mind_entry_inds = List.map one_ind (from_coq_list mi);
       mind_entry_universes = denote_mind_entry_universes uctx;
       mind_entry_private = unquote_map_option unquote_bool mpr (*mpr*)
@@ -521,7 +538,7 @@ let monad_failure_full s k prg =
        str "While trying to run: " ++ fnl () ++ print_term prg ++ fnl () ++
        str "Please file a bug with Template-Coq.")
 
-let rec run_template_program_rec ?(intactic=false) (k : Evd.evar_map * Constr.t -> unit)  ((evm, pgm) : Evd.evar_map * Constr.t) : unit =
+let rec run_template_program_rec ?(poly = false) ?(intactic=false) (k : Evd.evar_map * Constr.t -> unit)  ((evm, pgm) : Evd.evar_map * Constr.t) : unit =
   let env = Global.env () in
   let pgm = Reduction.whd_all env pgm in
   let (coConstr, args) = app_full pgm [] in
@@ -552,10 +569,8 @@ let rec run_template_program_rec ?(intactic=false) (k : Evd.evar_map * Constr.t 
     match args with
     | name::typ::body::[] ->
        let name = reduce_all env evm name in
-       let univs =
-         if Flags.is_universe_polymorphism () then Polymorphic_const_entry (Evd.to_universe_context evm)
-         else Monomorphic_const_entry (Evd.universe_context_set evm) in
-       let n = Declare.declare_definition ~kind:Decl_kinds.Definition (unquote_ident name) ~types:typ (body, univs) in
+       let entry = Evd.const_univ_entry ~poly evm in
+       let n = Declare.declare_definition ~kind:Decl_kinds.Definition (unquote_ident name) ~types:typ (body, entry) in
        k (evm, Constr.mkConst n)
     | _ -> monad_failure "tmDefinition" 3
   else if GlobRef.equal glob_ref tmAxiom then
@@ -572,7 +587,6 @@ let rec run_template_program_rec ?(intactic=false) (k : Evd.evar_map * Constr.t 
     match args with
     | name::typ::[] ->
        let name = reduce_all env evm name in
-       let poly = Flags.is_universe_polymorphism () in
        let kind = (Decl_kinds.Global, poly, Decl_kinds.Definition) in
        let hole = CAst.make (Constrexpr.CHole (None, Namegen.IntroAnonymous, None)) in
        let evm, (c, _) = Constrintern.interp_casted_constr_evars_impls env evm hole (EConstr.of_constr typ) in
@@ -581,10 +595,10 @@ let rec run_template_program_rec ?(intactic=false) (k : Evd.evar_map * Constr.t 
        let obls, _, c, cty = Obligations.eterm_obligations env ident evm 0
            (EConstr.to_constr ~abort_on_undefined_evars:false evm c) typ in
        let ctx = Evd.evar_universe_context evm in
-       let hook = Lemmas.mk_hook (fun _ gr _ -> let env = Global.env () in
-                                                let evm = Evd.from_env env in
-                                                let evm, t = Evd.fresh_global env evm gr in
-                                                  k (evm, EConstr.to_constr evm t)) in
+       let hook = Obligations.mk_univ_hook (fun _ _ _ gr -> let env = Global.env () in
+                                              let evm = Evd.from_env env in
+                                              let evm, t = Evd.fresh_global env evm gr in
+                                              k (evm, EConstr.to_constr evm t)) in
        ignore (Obligations.add_definition ident ~term:c cty ctx ~kind ~hook obls)
     (* let kind = Decl_kinds.(Global, Flags.use_polymorphic_flag (), DefinitionBody Definition) in *)
     (* Lemmas.start_proof (unquote_ident name) kind evm (EConstr.of_constr typ) *)
