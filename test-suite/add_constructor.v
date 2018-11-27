@@ -34,6 +34,7 @@ Polymorphic Definition add_ctor (mind : mutual_inductive_body) (ind0 : inductive
   : mutual_inductive_body
   := let i0 := inductive_ind ind0 in
      {| ind_npars := mind.(ind_npars) ;
+        ind_params := mind.(ind_params) ;
         ind_universes := mind.(ind_universes) ;
         ind_bodies := map_i (fun (i : nat) (ind : one_inductive_body) =>
                          {| ind_name := tsl_ident ind.(ind_name) ;
