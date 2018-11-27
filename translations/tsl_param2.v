@@ -142,17 +142,33 @@ Fixpoint replace t k u {struct u} :=
   | x => x
   end.
 
+Fixpoint decompose_prod_n n (c : context) (t : term) : context * term :=
+  match n with
+  | 0 => (c, t)
+  | S n =>
+    match t with
+    | tProd na A B => decompose_prod_n n (vass na A :: c) B
+    | _ => (c, t)
+    end
+  end.
 
 
 Definition tsl_mind_body (ΣE : tsl_context)
            (kn kn' : kername) (mind : mutual_inductive_body)
   : tsl_result (tsl_table * list mutual_inductive_body).
   refine (let tsl_ty' := tsl_ty_param fuel (fst ΣE) (snd ΣE) [] in _).
-  refine (let tsl2' := tsl_rec2 fuel (fst ΣE) (snd ΣE) [] in _).
+  refine (let tsl2' := tsl_rec2 fuel (fst ΣE) (snd ΣE) in _).
   simple refine (let arities := List.map ind_type mind.(ind_bodies) in
-                 arities2 <- monad_map tsl2' arities ;;
+                 arities2 <- monad_map (tsl2' []) arities ;;
                  bodies <- _ ;;
+                 let params :=
+                     match bodies with
+                     | hd :: tl => fst (decompose_prod_n mind.(ind_npars) [] hd.(ind_type))
+                     | _ => []
+                     end
+                 in
                  ret (_, [{| ind_npars := mind.(ind_npars);
+                             ind_params := params;
                              ind_bodies := bodies ;
                  ind_universes := mind.(ind_universes)|}])).  (* FIXME always ok? *)
   (* L is [(tInd n, tRel 0); ... ; (tInd 0, tRel n)] *)
@@ -172,13 +188,13 @@ Definition tsl_mind_body (ΣE : tsl_context)
                    ind_ctors := ctors;
                    ind_projs := [] |}).  (* TODO *)
     + (* arity  *)
-      refine (t2 <- tsl2' ind.(ind_type) ;;
+      refine (t2 <- tsl2' [] ind.(ind_type) ;;
               let i1 := tsl_rec1 0 (tInd (mkInd kn i) []) in
               ret (try_reduce (fst (fst ΣE)) [] fuel (mkApp t2 i1))).
     + (* constructors *)
       refine (monad_map_i _ ind.(ind_ctors)).
       intros k ((name, typ), nargs).
-      refine (t2 <- tsl2' typ ;;
+      refine (t2 <- tsl2' [] typ ;;
               let t2 := fold_left_i (fun t i u => replace u i t) L t2 in
               let c1 := tsl_rec1 0 (tConstruct (mkInd kn i) k []) in
               match reduce_opt RedFlags.default (fst (fst ΣE)) [] (* for debugging but we could use try_reduce *)

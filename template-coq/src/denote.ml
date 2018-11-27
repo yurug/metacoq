@@ -590,6 +590,7 @@ let rec run_template_program_rec ?(poly = false) ?(intactic=false) (k : Evd.evar
        let kind = (Decl_kinds.Global, poly, Decl_kinds.Definition) in
        let hole = CAst.make (Constrexpr.CHole (None, Namegen.IntroAnonymous, None)) in
        let evm, (c, _) = Constrintern.interp_casted_constr_evars_impls env evm hole (EConstr.of_constr typ) in
+       let evm = Evd.set_obligation_evar evm (fst (EConstr.destEvar evm c)) in
        let ident = unquote_ident name in
        Obligations.check_evars env evm;
        let obls, _, c, cty = Obligations.eterm_obligations env ident evm 0

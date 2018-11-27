@@ -102,11 +102,9 @@ Fixpoint replace pat u t {struct t} :=
 (* If tm of type typ = Π [A0] [A1] ... . [B], returns *)
 (* a term of type [Π A0 A1 ... . B] *)
 Definition pouet (tm typ : term) : term.
-  refine (let L := decompose_prod typ in _).
-  simple refine (let L' := List.fold_left _ (combine' (Datatypes.fst L)) [] in _).
-  exact (fun Γ' A => Γ' ,, vass (Datatypes.fst A) (Datatypes.snd A)).
-  refine (let args := fold_left_i (fun l i _ => tRel i :: l) L' [] in _).
-  refine (Datatypes.fst (List.fold_left _ L' (subst_app tm args, Datatypes.snd L))).
+  refine (let L := decompose_prod_acc [] typ in _).
+  refine (let args := fold_left_i (fun l i _ => tRel i :: l) (List.rev (Datatypes.fst L)) [] in _).
+  refine (Datatypes.fst (List.fold_left _ (Datatypes.fst L) (subst_app tm args, Datatypes.snd L))).
   refine (fun '(tm, typ) decl =>
             let A := tProd decl.(decl_name) decl.(decl_type) typ in
             (pairTrue A (tLambda decl.(decl_name) decl.(decl_type) tm),
@@ -123,8 +121,11 @@ Definition tsl_mind_body (ΣE : tsl_context) (kn kn' : kername)
                              | Error _ => todo
                              end in _).
   refine (let LI := List.split (map_i _ mind.(ind_bodies)) in
+          let L := List.fold_right (fun A Γ => Γ ,, vass (decl_name A) (tsl Γ (decl_type A)))
+                                   [] mind.(ind_params) in
           ret (List.concat (Datatypes.fst LI),
                [{| ind_npars := mind.(ind_npars);
+                   ind_params := L;
                    ind_bodies := Datatypes.snd LI;
                    ind_universes := mind.(ind_universes)|}])). (* FIXME always ok? *)
   intros i ind.
@@ -137,9 +138,9 @@ Definition tsl_mind_body (ΣE : tsl_context) (kn kn' : kername)
                      ind_ctors := Datatypes.snd ctors';
                      ind_projs := [] |})).
   + (* arity *)
-    refine (let L := decompose_prod ind.(ind_type) in _).
-    simple refine (let L' := List.fold_left _ (combine' (Datatypes.fst L)) [] in _).
-    exact (fun Γ' A => Γ' ,, vass (Datatypes.fst A) (tsl Γ' (Datatypes.snd A))).
+    refine (let L := decompose_prod_acc [] ind.(ind_type) in _).
+    simple refine (let L' := List.fold_right _ [] (Datatypes.fst L) in _).
+    exact (fun A Γ' => Γ' ,, vass (decl_name A) (tsl Γ' (decl_type A))).
     refine (List.fold_left _ L' (Datatypes.snd L)).
     exact (fun t decl => tProd decl.(decl_name) decl.(decl_type) t).
   + (* constructors *)
@@ -150,9 +151,9 @@ Definition tsl_mind_body (ΣE : tsl_context) (kn kn' : kername)
                     (tsl_ident name, ctor_type', nargs))).
     * refine (fold_left_i (fun t i _ => replace (proj1 (tRel i)) (tRel i) t)
                           mind.(ind_bodies) _).
-      refine (let L := decompose_prod typ in _).
-      simple refine (let L' := List.fold_left _ (combine' (Datatypes.fst L)) [] in _).
-      exact (fun Γ' A => Γ' ,, vass (Datatypes.fst A) (tsl Γ' (Datatypes.snd A))).
+      refine (let L := decompose_prod_acc [] typ in _).
+      simple refine (let L' := List.fold_right _ [] (Datatypes.fst L) in _).
+      exact (fun A Γ' => Γ' ,, vass (decl_name A) (tsl Γ' (decl_type A))).
       refine (List.fold_left _ L' _).
       exact (fun t decl => tProd decl.(decl_name) decl.(decl_type) t).
       exact (match Datatypes.snd L with

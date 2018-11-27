@@ -71,15 +71,10 @@ Definition mind_body_to_entry (decl : mutual_inductive_body)
 Proof.
   refine {| mind_entry_record := None; (* not a record *)
             mind_entry_finite := Finite; (* inductive *)
-            mind_entry_params := _;
+            mind_entry_params := decl.(ind_params);
             mind_entry_inds := _;
             mind_entry_universes := decl.(ind_universes);
             mind_entry_private := None |}.
-  - refine (match List.hd_error decl.(ind_bodies) with
-            | Some i0 => _
-            | None => nil (* assert false: at least one inductive in a mutual block *)
-            end).
-    refine (fst (decompose_prod_acc [] i0.(ind_type))).
   - refine (List.map _ decl.(ind_bodies)).
     intros [].
     refine {| mind_entry_typename := ind_name;

@@ -108,11 +108,28 @@ Fixpoint tsl_rec1_app (app : option term) (E : tsl_table) (t : term) : term :=
   end.
 Definition tsl_rec1 := tsl_rec1_app None.
 
+Fixpoint decompose_prod_n n (c : context) (t : term) : context * term :=
+  match n with
+  | 0 => (c, t)
+  | S n =>
+    match t with
+    | tProd na A B => decompose_prod_n n (vass na A :: c) B
+    | _ => (c, t)
+    end
+  end.
+
 Definition tsl_mind_body (E : tsl_table)
            (kn kn' : kername) (mind : mutual_inductive_body) : tsl_table * list mutual_inductive_body.
-  refine (_, [{| ind_npars := 2 * mind.(ind_npars);
-                 ind_bodies := _;
-                 ind_universes := mind.(ind_universes)|}]).  (* FIXME always ok? *)
+  refine (_,
+          let bodies := _ in
+          [{| ind_npars := 2 * mind.(ind_npars);
+              ind_params :=
+                match bodies with
+                | hd :: tl => fst (decompose_prod_n (2 * mind.(ind_npars)) [] hd.(ind_type))
+                | _ => []
+                end;
+              ind_bodies := bodies;
+              ind_universes := mind.(ind_universes)|}]).  (* FIXME always ok? *)
   - refine (fold_left_i (fun E i ind => _ :: _ ++ E)%list mind.(ind_bodies) []).
     + (* ind *)
       exact (IndRef (mkInd kn i), tInd (mkInd kn' i) []).
