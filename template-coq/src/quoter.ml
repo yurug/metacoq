@@ -59,13 +59,13 @@ let hnf_type env ty =
 
 (* Remove '#' from names *)
 let clean_name s =
-  let l = List.rev (CString.split '#' s) in
+  let l = List.rev (CString.split_on_char '#' s) in
   match l with
     s :: rst -> s
   | [] -> raise (Failure "Empty name cannot be quoted")
 
 let split_name s : (Names.DirPath.t * Names.Id.t) =
-  let ss = List.rev (CString.split '.' s) in
+  let ss = List.rev (CString.split_on_char '.' s) in
   match ss with
     nm :: rst ->
      let nm = clean_name nm in
@@ -228,7 +228,7 @@ struct
   let open Univ in
   let univs = ACumulativityInfo.univ_context cumi in
   let expose ctx =
-    let inst = AUContext.instance ctx in
+    let inst = UContext.instance (Univ.AUContext.repr ctx) in
     let cst = AUContext.instantiate inst ctx in
     UContext.make (inst, cst)
   in CumulativityInfo.make (expose univs, ACumulativityInfo.variance cumi)
@@ -348,14 +348,14 @@ struct
           try Retyping.get_type_of env' Evd.empty trm
           with e ->
             Feedback.msg_debug (str"Anomaly trying to get the type of: " ++
-                                  Termops.print_constr_env (snd env) Evd.empty trm);
+                                  Termops.Internal.print_constr_env (snd env) Evd.empty trm);
             raise e
         in
         let sf =
           try Retyping.get_sort_family_of env' Evd.empty ty
           with e ->
             Feedback.msg_debug (str"Anomaly trying to get the sort of: " ++
-                                  Termops.print_constr_env (snd env) Evd.empty ty);
+                                  Termops.Internal.print_constr_env (snd env) Evd.empty ty);
             raise e
         in
         if sf == Term.InProp then
