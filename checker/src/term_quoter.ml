@@ -44,7 +44,6 @@ struct
   type quoted_univ_context = Univ0.universe_context
   type quoted_inductive_universes = quoted_univ_context
 
-  type quoted_mind_params = (ident * local_entry) list
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
   type quoted_definition_entry = t * t option * quoted_univ_context
   type quoted_mind_entry = mutual_inductive_entry
@@ -144,8 +143,8 @@ struct
 
   let quote_inductive_universes = function
     | Entries.Monomorphic_ind_entry ctx -> quote_univ_context (Univ.ContextSet.to_context ctx)
-    | Entries.Polymorphic_ind_entry ctx -> quote_abstract_univ_context_aux ctx
-    | Entries.Cumulative_ind_entry ctx ->
+    | Entries.Polymorphic_ind_entry (na, ctx) -> quote_abstract_univ_context_aux ctx
+    | Entries.Cumulative_ind_entry (na, ctx) ->
       quote_abstract_univ_context_aux (Univ.CumulativityInfo.univ_context ctx)
 
   let quote_context_decl na b t =
@@ -232,13 +231,6 @@ struct
     | Declarations.CoFinite -> CoFinite
     | Declarations.BiFinite -> BiFinite
 
-  let quote_mind_params l =
-    let map (id, body) =
-      match body with
-      | Left ty -> (id, LocalAssum ty)
-      | Right trm -> (id, LocalDef trm)
-    in List.map map l
-
   let quote_one_inductive_entry (id, ar, b, consnames, constypes) =
     { mind_entry_typename = id;
       mind_entry_arity = ar;
@@ -309,11 +301,11 @@ struct
 
   let unquote_inductive (q: quoted_inductive) : Names.inductive =
     let { inductive_mind = na; inductive_ind = i } = q in
-    let comps = CString.split '.' (unquote_string na) in
+    let comps = CString.split_on_char '.' (unquote_string na) in
     let comps = List.map Id.of_string comps in
     let id, dp = CList.sep_last comps in
     let dp = DirPath.make dp in
-    let mind = Globnames.encode_mind dp id in
+    let mind = MutInd.make2 (MPfile dp) (Label.of_id id) in
     (mind, unquote_int i)
 
   (*val unquote_univ_instance :  quoted_univ_instance -> Univ.Instance.t *)
@@ -327,7 +319,7 @@ struct
     | Univ0.Level.Coq_lSet -> Univ.Level.set
     | Univ0.Level.Level s ->
       let s = unquote_string s in
-      let comps = CString.split '.' s in
+      let comps = CString.split_on_char '.' s in
       let last, dp = CList.sep_last comps in
       let dp = DirPath.make (List.map Id.of_string comps) in
       let idx = int_of_string last in

@@ -2,6 +2,7 @@
 
 DECLARE PLUGIN "template_coq_checker"
 
+{
 open Stdarg
 open Pp
 open PeanoNat.Nat
@@ -23,11 +24,12 @@ let check env evm c =
      CErrors.user_err ~hdr:"template-coq" (str "Already declared: " ++ pr_char_list id)
   | EnvError (IllFormedDecl (id, e)) ->
      CErrors.user_err ~hdr:"template-coq" (pr_char_list (Checker0.string_of_type_error e) ++ str ", while checking " ++ pr_char_list id)
+}
 
 VERNAC COMMAND EXTEND TemplateCheck CLASSIFIED AS QUERY
-| [ "Template" "Check" constr(c) ] -> [
+| [ "Template" "Check" constr(c) ] -> {
     let (evm,env) = Pfedit.get_current_context () in
     let (c, _) = Constrintern.interp_constr env evm c in
     check env evm c
-  ]
+  }
 END

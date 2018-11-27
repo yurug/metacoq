@@ -36,12 +36,10 @@ Definition decompose_app (t : term) :=
   | _ => (t, [])
   end.
 
-Fixpoint decompose_prod (t : term) : (list name) * (list term) * term :=
+Fixpoint decompose_prod_acc (c : context) (t : term) : context * term :=
   match t with
-  | tProd n A B => let (nAs, B) := decompose_prod B in
-                  let (ns, As) := nAs in
-                  (n :: ns, A :: As, B)
-  | _ => ([], [], t)
+  | tProd n A B => decompose_prod_acc (vass n A :: c) B
+  | _ => (c, t)
   end.
 
 Definition get_ident (n : name) :=
@@ -81,13 +79,7 @@ Proof.
             | Some i0 => _
             | None => nil (* assert false: at least one inductive in a mutual block *)
             end).
-    pose (typ := decompose_prod i0.(ind_type)).
-    destruct typ as [[names types] _].
-    apply (List.firstn decl.(ind_npars)) in names.
-    apply (List.firstn decl.(ind_npars)) in types.
-    refine (List.combine _ _).
-    exact (List.map get_ident names).
-    exact (List.map LocalAssum types).
+    refine (fst (decompose_prod_acc [] i0.(ind_type))).
   - refine (List.map _ decl.(ind_bodies)).
     intros [].
     refine {| mind_entry_typename := ind_name;

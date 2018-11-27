@@ -82,7 +82,7 @@ src/retyping0.mli
 src/retyping0.ml
 
 src/term_quoter.ml
-src/g_template_checker.ml4
+src/g_template_checker.mlg
 src/template_coq_checker_plugin.mlpack
 
 theories/Loader.v
