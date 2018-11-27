@@ -341,8 +341,7 @@ struct
     | Sorts.InType -> sfType
 
   let quote_context_decl na b t =
-    pair (prod tname (Constr.mkApp (option_type, [| tTerm |]))) tTerm
-      (pair tname (Constr.mkApp (option_type, [| tTerm |])) na (quote_option tTerm b)) t
+    Constr.mkApp (tmkdecl, [| na; quote_option tTerm b; t |])
 
   let quote_context ctx =
     to_coq_list tcontext_decl ctx
