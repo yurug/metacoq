@@ -36,6 +36,7 @@ Polymorphic Definition add_ctor (mind : mutual_inductive_body) (ind0 : inductive
      {| ind_npars := mind.(ind_npars) ;
         ind_params := mind.(ind_params) ;
         ind_universes := mind.(ind_universes) ;
+        ind_params := mind.(ind_params);
         ind_bodies := map_i (fun (i : nat) (ind : one_inductive_body) =>
                          {| ind_name := tsl_ident ind.(ind_name) ;
                             ind_type  := ind.(ind_type) ;
@@ -66,7 +67,7 @@ Polymorphic Definition add_constructor {A} (ind : A) (idc : ident) {B} (ctor : B
 
 
 (** * Examples *)
-
+Local Open Scope string.
 (** Here we add a silly constructor to bool. *)
 Run TemplateProgram (add_constructor bool "foo" (fun bool' => nat -> bool' -> bool -> bool')).
 

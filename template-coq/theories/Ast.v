@@ -12,7 +12,7 @@ From Template Require Export univ uGraph.
       We reflect identifiers [ident], sort families [sort_family], names
     [name], cast kinds [cast_kind], inductives [inductive] and primitive
     projections [projection] and (co)-fixpoint blocks [mfixpoint] and
-    [def].
+    [def]. These are defined in the [BasicAst] file.
 
     ** Terms:
 
@@ -39,57 +39,27 @@ From Template Require Export univ uGraph.
     TemplateProgram] on a monad action to produce its side-effects.
     Uses a reduction strategy specifier [reductionStrategy].  *)
 
-Definition ident := string. (* e.g. nat *)
-Definition kername := string. (* e.g. Coq.Init.Datatypes.nat *)
-
-Inductive sort_family : Set := InProp | InSet | InType.
-
-Inductive name : Set :=
-| nAnon
-| nNamed (_ : ident).
-
-Inductive cast_kind : Set :=
-| VmCast
-| NativeCast
-| Cast
-| RevertCast.
-
-Record inductive : Set := mkInd { inductive_mind : kername ;
-                                  inductive_ind : nat }.
-Arguments mkInd _%string _%nat.
-
-Definition projection : Set := inductive * nat (* params *) * nat (* argument *).
-
-(** Parametrized by term because term is not yet defined *)
-Record def (term : Set) : Set := mkdef {
-  dname : name; (* the name **)
-  dtype : term;
-  dbody : term; (* the body (a lambda term). Note, this may mention other (mutually-defined) names **)
-  rarg  : nat  (* the index of the recursive argument, 0 for cofixpoints **) }.
-
-Definition mfixpoint (term : Set) : Set :=
-  list (def term).
+Require Export BasicAst.
 
 Inductive term : Set :=
-| tRel       : nat -> term
-| tVar       : ident -> term (* For free variables (e.g. in a goal) *)
-| tMeta      : nat -> term   (* NOTE: this will go away *)
-| tEvar      : nat -> list term -> term
-| tSort      : universe -> term
-| tCast      : term -> cast_kind -> term -> term
-| tProd      : name -> term (* the type *) -> term -> term
-| tLambda    : name -> term (* the type *) -> term -> term
-| tLetIn     : name -> term (* the term *) -> term (* the type *) -> term -> term
-| tApp       : term -> list term -> term
-| tConst     : kername -> universe_instance -> term
-| tInd       : inductive -> universe_instance -> term
-| tConstruct : inductive -> nat -> universe_instance -> term
-| tCase      : (inductive * nat) (* # of parameters *) -> term (* type info *)
-               -> term (* discriminee *) -> list (nat * term) (* branches *) -> term
-| tProj      : projection -> term -> term
-| tFix       : mfixpoint term -> nat -> term
-| tCoFix     : mfixpoint term -> nat -> term.
-
+| tRel (n : nat)
+| tVar (id : ident) (* For free variables (e.g. in a goal) *)
+| tMeta (meta : nat) (* NOTE: this will go away *)
+| tEvar (ev : nat) (args : list term)
+| tSort (s : universe)
+| tCast (t : term) (kind : cast_kind) (v : term)
+| tProd (na : name) (ty : term) (body : term)
+| tLambda (na : name) (ty : term) (body : term)
+| tLetIn (na : name) (def : term) (def_ty : term) (body : term)
+| tApp (f : term) (args : list term)
+| tConst (c : kername) (u : universe_instance)
+| tInd (ind : inductive) (u : universe_instance)
+| tConstruct (ind : inductive) (idx : nat) (u : universe_instance)
+| tCase (ind_and_nbparams: inductive*nat) (type_info:term)
+        (discr:term) (branches : list (nat * term))
+| tProj (proj : projection) (t : term)
+| tFix (mfix : mfixpoint term) (idx : nat)
+| tCoFix (mfix : mfixpoint term) (idx : nat).
 
 Definition mkApps t us :=
   match us with
@@ -105,6 +75,12 @@ Definition mkApp t u := Eval cbn in mkApps t [u].
 Definition isApp t :=
   match t with
   | tApp _ _ => true
+  | _ => false
+  end.
+
+Definition isLambda t :=
+  match t with
+  | tLambda _ _ _ => true
   | _ => false
   end.
 
@@ -126,8 +102,9 @@ Inductive wf : term -> Prop :=
 | wf_tConstruct i k u : wf (tConstruct i k u)
 | wf_tCase ci p c brs : wf p -> wf c -> Forall (Program.Basics.compose wf snd) brs -> wf (tCase ci p c brs)
 | wf_tProj p t : wf t -> wf (tProj p t)
-| wf_tFix mfix k : Forall (fun def => wf def.(dtype _) /\ wf def.(dbody _)) mfix -> wf (tFix mfix k)
-| wf_tCoFix mfix k : Forall (fun def => wf def.(dtype _) /\ wf def.(dbody _)) mfix -> wf (tCoFix mfix k).
+| wf_tFix mfix k : Forall (fun def => wf def.(dtype) /\ wf def.(dbody) /\ isLambda def.(dbody) = true) mfix ->
+                   wf (tFix mfix k)
+| wf_tCoFix mfix k : Forall (fun def => wf def.(dtype) /\ wf def.(dbody)) mfix -> wf (tCoFix mfix k).
 
 (** ** Declarations *)
 
@@ -158,6 +135,10 @@ Notation " Γ ,, d " := (snoc Γ d) (at level 20, d at next level).
 
 (** *** Environments *)
 
+Inductive universes :=
+  | Monomorphic (uctx : universe_context)
+  | Polymorphic (uctx : universe_context)
+
 (** See [one_inductive_body] from [declarations.ml]. *)
 Record one_inductive_body := {
   ind_name : ident;
@@ -173,7 +154,9 @@ Record mutual_inductive_body := {
   ind_npars : nat;
   ind_params : context;
   ind_bodies : list one_inductive_body ;
-  ind_universes : universe_context }.
+  ind_universes : universes;
+  ind_variance : option (list Variance.t);
+ }.
 
 (** See [constant_body] from [declarations.ml] *)
 Record constant_body := {
@@ -200,12 +183,6 @@ Definition program : Type := global_declarations * term.
 
 (** Kernel declaration references [global_reference] *)
 
-Inductive global_reference :=
-(* VarRef of Names.variable *)
-| ConstRef : kername -> global_reference
-| IndRef : inductive -> global_reference
-| ConstructRef : inductive -> nat -> global_reference.
-
 (** ** Entries
 
   The kernel accepts these inputs and typechecks them to produce
@@ -214,14 +191,18 @@ Inductive global_reference :=
 
 (** *** Constant and axiom entries *)
 
+Inductive universes_entry :=
+  | Monomorphic_entry (uctx : universe_context)
+  | Polymorphic_entry (uctx : universe_context)
+
 Record parameter_entry := {
   parameter_entry_type      : term;
-  parameter_entry_universes : universe_context }.
+  parameter_entry_universes : universes_entry }.
 
 Record definition_entry := {
   definition_entry_type      : term;
   definition_entry_body      : term;
-  definition_entry_universes : universe_context;
+  definition_entry_universes : universes_entry;
   definition_entry_opaque    : bool }.
 
 
@@ -273,7 +254,8 @@ Record mutual_inductive_entry := {
   mind_entry_finite    : recursivity_kind;
   mind_entry_params    : context;
   mind_entry_inds      : list one_inductive_entry;
-  mind_entry_universes : universe_context;
+  mind_entry_universes : universes_entry;
+  mind_entry_variance  : option (list Variance.t);
   mind_entry_private   : option bool
   (* Private flag for sealing an inductive definition in an enclosing
      module. Not handled by Template Coq yet. *) }.

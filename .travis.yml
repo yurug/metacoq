@@ -13,7 +13,6 @@ addons:
     packages:
     - opam
     - aspcud
-    - gcc-multilib
 
 env:
   global:
@@ -21,12 +20,10 @@ env:
   - COMPILER="4.06.1"
   - CAMLP5_VER="7.05"
   - FINDLIB_VER="1.8.0"
-  - NATIVE_COMP="yes"
   - COQ_VER="dev"
 
 install:
-- opam init -j ${NJOBS} -n -y
-- opam update
+- opam init -j ${NJOBS} -n -y --compiler=$COMPILER
 - opam switch set ${COMPILER}
 - eval $(opam config env)
 - opam config list
@@ -36,7 +33,7 @@ install:
 - opam list
 
 script:
- - make -j ${NJOBS} VERBOSE=1 all test-suite
+ - make -j ${NJOBS} all test-suite
 
 notifications:
   webhooks:

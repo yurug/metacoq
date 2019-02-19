@@ -100,16 +100,18 @@ End Level.
 Require FSets.FSetWeakList.
 Require FSets.FMapWeakList.
 Module LevelDecidableType.
-   Definition t : Set := Level.t.
+   Definition t : Type := Level.t.
    Definition eq : t -> t -> Prop := eq.
    Definition eq_refl : forall x : t, eq x x := @eq_refl _.
    Definition eq_sym : forall x y : t, eq x y -> eq y x := @eq_sym _.
    Definition eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z := @eq_trans _.
+   Definition eq_equiv : RelationClasses.Equivalence eq.
+   Proof. constructor. red. apply eq_refl. red. apply eq_sym. red. apply eq_trans. Defined.
    Definition eq_dec : forall x y : t, {eq x y} + {~ eq x y}.
      unfold eq. decide equality. apply string_dec. apply Peano_dec.eq_nat_dec.
    Defined.
 End LevelDecidableType.
-Module LevelSet := FSets.FSetWeakList.Make LevelDecidableType.
+Module LevelSet <: (MSetInterface.WSetsOn LevelDecidableType) := MSets.MSetWeakList.Make LevelDecidableType.
 Module LevelMap := FSets.FMapWeakList.Make LevelDecidableType.
 
 Definition universe_level := Level.t.
@@ -296,7 +298,7 @@ Module UnivConstraintDec.
     decide equality. decide equality. apply LevelDecidableType.eq_dec.
   Defined.
 End UnivConstraintDec.
-Module ConstraintSet := MSets.MSetWeakList.Make UnivConstraintDec.
+Module ConstraintSet <: MSetInterface.WSetsOn UnivConstraintDec := MSets.MSetWeakList.Make UnivConstraintDec.
 
 Definition make_univ_constraint : universe_level -> constraint_type -> universe_level -> univ_constraint
   := fun x y z => (x, y, z).
@@ -411,40 +413,49 @@ Module UContext.
   (* val size : t -> int *)
 End UContext.
 
+(* Variance info is needed to do full universe polymorphism *)
+Module Variance.
+  (** A universe position in the instance given to a cumulative
+     inductive can be the following. Note there is no Contravariant
+     case because [forall x : A, B <= forall x : A', B'] requires [A =
+     A'] as opposed to [A' <= A]. *)
+  Inductive t :=
+  | Irrelevant : t
+  | Covariant : t
+  | Invariant : t.
+
+  (* val check_subtype : t -> t -> bool *)
+  (* val sup : t -> t -> t *)
+  (* val pr : t -> Pp.t *)
+End Variance.
+
+(** Universe info for cumulative inductive types: A context of
+   universe levels with universe constraints, representing local
+   universe variables and constraints, together with an array of
+   Variance.t.
+
+    This data structure maintains the invariant that the variance
+   array has the same length as the universe instance. *)
+Module CumulativityInfo.
+  Definition t := prod UContext.t (list Variance.t).
+
+  Definition empty : t := (UContext.empty, nil).
+  (* val is_empty : t -> bool *)
+
+  Definition univ_context : t -> UContext.t := fst.
+  Definition variance : t -> list Variance.t := snd.
+
+  (** This function takes a universe context representing constraints
+     of an inductive and produces a CumulativityInfo.t with the
+     trivial subtyping relation. *)
+  (* val from_universe_context : UContext.t -> t *)
+
+  (* val leq_constraints : t -> Instance.t constraint_function *)
+  (* val eq_constraints : t -> Instance.t constraint_function *)
+End CumulativityInfo.
+
 Inductive universe_context : Type :=
 | Monomorphic_ctx (ctx : UContext.t)
-| Polymorphic_ctx (cst : UContext.t).
+| Polymorphic_ctx (cst : UContext.t)
+| Cumulative_ctx (ctx : CumulativityInfo.t).
 
-(* (** Universe info for inductive types: A context of universe levels *)
-(*     with universe constraints, representing local universe variables *)
-(*     and constraints, together with a context of universe levels with *)
-(*     universe constraints, representing conditions for subtyping used *)
-(*     for inductive types. *)
-
-(*     This data structure maintains the invariant that the context for *)
-(*     subtyping constraints is exactly twice as big as the context for *)
-(*     universe constraints. *) *)
-(* module CumulativityInfo : *)
-(* sig *)
-(*   type t *)
-
-(*   val make : universe_context * universe_context -> t *)
-
-(*   val empty : t *)
-(*   val is_empty : t -> bool *)
-
-(*   val univ_context : t -> universe_context *)
-(*   val subtyp_context : t -> universe_context *)
-
-(*   (** This function takes a universe context representing constraints *)
-(*       of an inductive and a Instance.t of fresh universe names for the *)
-(*       subtyping (with the same length as the context in the given *)
-(*       universe context) and produces a UInfoInd.t that with the *)
-(*       trivial subtyping relation. *) *)
-(*   val from_universe_context : universe_context -> universe_instance -> t *)
-
-(*   val subtyping_susbst : t -> universe_level_subst *)
-
-(* end *)
-
-(* type cumulativity_info = CumulativityInfo.t *)

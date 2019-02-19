@@ -4,6 +4,8 @@
 -I src
 -Q src TemplateChecker
 
+CAMLFLAGS = -linkall
+
 src/decimal.mli
 src/decimal.ml
 src/peanoNat.mli
@@ -58,8 +60,8 @@ src/ordersTac.ml
 src/orderedType0.mli
 src/orderedType0.ml
 
-src/induction.mli
-src/induction.ml
+src/basicAst.mli
+src/basicAst.ml
 src/ast0.mli
 src/ast0.ml
 src/astUtils.mli
@@ -86,3 +88,4 @@ src/g_template_checker.mlg
 src/template_coq_checker_plugin.mlpack
 
 theories/Loader.v
+demo.v
