@@ -213,9 +213,9 @@ Proof.
   - intuition auto. solve_all. unfold test_snd. simpl in *.
     toProp; eauto.
     apply closedn_mkApps; auto.
-    rewrite forallb_app. simpl. rewrite H4.
+    rewrite forallb_app. simpl. rewrite H0.
     rewrite forallb_skipn; auto.
-    now apply closedn_mkApps_inv in H9.
+    now apply closedn_mkApps_inv in H7.
 
   - intuition. subst ty.
     apply closedn_subst0.

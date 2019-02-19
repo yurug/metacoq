@@ -426,8 +426,11 @@ Definition string_of_def {A : Set} (f : A -> string) (def : def A) :=
 Definition string_of_inductive (i : inductive) :=
   (inductive_mind i) ++ "," ++ string_of_nat (inductive_ind i).
 
+Definition string_of_int (t : Int63.int) := "" (* TOOD *).
+
 Fixpoint string_of_term (t : term) :=
   match t with
+  | tInt n => "Int(" ++ string_of_int n ++ ")"
   | tRel n => "Rel(" ++ string_of_nat n ++ ")"
   | tVar n => "Var(" ++ n ++ ")"
   | tMeta n => "Meta(" ++ string_of_nat n ++ ")"
@@ -603,7 +606,6 @@ Section Typecheck2.
     match u with
     | Monomorphic_ctx _ => ConstraintSet.empty
     | Polymorphic_ctx ctx => UContext.constraints ctx
-    | Cumulative_ctx ctx => UContext.constraints (fst ctx)
     end.
 
   Definition lookup_constant_type cst u :=
@@ -670,6 +672,7 @@ Section Typecheck2.
 
   Fixpoint infer (Γ : context) (t : term) : typing_result term :=
     match t with
+    | tInt i => ret tInt_type
     | tRel n =>
       match nth_error Γ n with
       | Some d => ret (lift0 (S n) d.(decl_type))
@@ -859,8 +862,6 @@ Section Typecheck2.
       destruct cst_universes.
       -- simpl. reflexivity.
       -- simpl in *. destruct cst0. simpl in *.
-         destruct c. unfold check_consistent_constraints. rewrite H0. reflexivity.
-      -- simpl in *. destruct ctx as [[inst csts] variance]. simpl in *.
          destruct c. unfold check_consistent_constraints. rewrite H0. reflexivity.
 
     - admit.

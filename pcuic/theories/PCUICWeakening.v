@@ -916,9 +916,8 @@ Proof.
     econstructor; eauto.
 
   - rewrite -> lift_mkApps, map_app, map_skipn.
-    specialize (X4 _ _ _ X6 eq_refl).
-    specialize (X2 _ _ _ X6 eq_refl).
-    specialize (X1 _ _ _ X6 eq_refl).
+    specialize (X3 _ _ _ X5 eq_refl).
+    specialize (X1 _ _ _ X5 eq_refl).
     simpl. econstructor.
     4:{ eapply lift_types_of_case in H0.
         simpl in H0. subst pars. rewrite -> firstn_map. eapply H0.
@@ -935,7 +934,7 @@ Proof.
        apply lift_check_correct_arity.
     -- destruct idecl; simpl in *; auto.
        destruct decompose_prod_assum. auto.
-    -- now rewrite -> !lift_mkApps in X4.
+    -- now rewrite -> !lift_mkApps in X3.
     -- solve_all.
 
   - simpl.

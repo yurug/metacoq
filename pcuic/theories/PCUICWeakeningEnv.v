@@ -91,7 +91,7 @@ Lemma weakening_env_consistent_universe_context_instance:
       extends Σ Σ' -> consistent_universe_context_instance Σ' univs u.
 Proof.
   intros Σ u univs H1 Σ' H2. destruct univs; simpl in *; eauto.
-  all:(destruct UContext.dest; destruct H2 as [Σ'' ->]; simpl; auto). exact (fst ctx).
+  all:(destruct UContext.dest; destruct H2 as [Σ'' ->]; simpl; auto).
 Qed.
 Hint Resolve weakening_env_consistent_universe_context_instance : extends.
 
@@ -161,7 +161,7 @@ Proof.
   apply typing_ind_env; intros; try solve [econstructor; eauto 2 with extends].
 
   - econstructor; eauto 2 with extends.
-    destruct X7 as [Σ'' ->]. simpl; auto.
+    destruct X6 as [Σ'' ->]. simpl; auto.
     close_Forall. intros; intuition eauto with extends.
   - econstructor; eauto with extends.
     eapply weakening_All_local_env_impl. eapply X.

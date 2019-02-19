@@ -1120,6 +1120,7 @@ Proof.
     induction m. reflexivity.
     inv H0. intuition.
     simpl. rewrite H0 H3. simpl. apply H1.
+  - now apply Int63.eqb_spec.
 Qed.
 
 Lemma eq_term_leq_term `{checker_flags} φ t u : eq_term φ t u = true -> leq_term φ t u = true.
@@ -1389,8 +1390,7 @@ Proof.
 
   - rewrite subst_mkApps map_app map_skipn.
     specialize (X1 Γ Γ' Δ s sub eq_refl wfsubs).
-    specialize (X4 Γ Γ' Δ s sub eq_refl wfsubs).
-    specialize (X2 Γ Γ' Δ s sub eq_refl wfsubs).
+    specialize (X3 Γ Γ' Δ s sub eq_refl wfsubs).
     simpl. econstructor.
     4:{ eapply subst_types_of_case in H1.
         simpl in H1. subst pars. rewrite firstn_map. eapply H1; eauto.
@@ -1401,7 +1401,7 @@ Proof.
     -- revert H2. subst pars.
        apply subst_check_correct_arity.
     -- destruct idecl; simpl in *; auto.
-    -- now rewrite !subst_mkApps in X4.
+    -- now rewrite !subst_mkApps in X3.
     -- solve_all.
 
   - specialize (X1 Γ Γ' Δ s sub eq_refl wfsubs).
