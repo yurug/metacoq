@@ -37,6 +37,7 @@ Lemma term_forall_list_ind :
     (forall (s : projection) (t : term), P t -> P (tProj s t)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P m -> P (tFix m n)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P m -> P (tCoFix m n)) ->
+    (forall (i : Int63.int), P (tInt i)) ->
     forall t : term, P t.
 Proof.
   intros until t. revert t.
@@ -95,44 +96,37 @@ Lemma term_wf_forall_list_ind :
     (forall (s : projection) (t : term), P t -> P (tProj s t)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P m -> Forall (fun def => isLambda (dbody def) = true) m -> P (tFix m n)) ->
     (forall (m : mfixpoint term) (n : nat), tFixProp P P m -> P (tCoFix m n)) ->
+    (forall (i : Int63.int), P (tInt i)) ->
     forall t : term, wf t -> P t.
 Proof.
   intros until t. revert t.
   apply (term_forall_list_ind (fun t => wf t -> P t));
     intros; try solve [match goal with
                  H : _ |- _ => apply H
-              end; auto].
-  apply H2. inv H17.
-  auto using lift_to_wf_list.
+              end; auto]; try on_last_hyp ltac:(fun H => inv H; auto).
 
-  inv H18; auto.
-  inv H18; auto.
-  inv H18; auto.
-  inv H19; auto.
-  inv H18; auto.
+
+  apply H2.
+  auto using lift_to_wf_list.
 
   apply H8; auto.
   auto using lift_to_wf_list.
 
-  inv H19; apply H12; auto.
+  apply H12; auto.
   red.
-  red in H18.
-  induction H18.
+  red in H19.
+  induction H19.
   constructor.
-  inv H22; auto.
+  inv H23; auto.
 
-  inv H17; auto.
-
-  inv H17; auto.
   apply H14. red.
-  red in H16.
-  induction H16. constructor.
-  inv H18; constructor; intuition auto.
-  clear H16; induction H18; constructor; intuition auto.
+  red in H17.
+  induction H17. constructor.
+  inv H19; constructor; intuition auto.
+  clear H17; induction H19; constructor; intuition auto.
 
-  inv H17; auto.
   apply H15. red.
-  red in H16.
-  induction H16. constructor.
-  inv H18; constructor; intuition auto.
+  red in H17.
+  induction H17. constructor.
+  inv H19; constructor; intuition auto.
 Qed.

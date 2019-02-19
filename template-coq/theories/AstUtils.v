@@ -212,8 +212,11 @@ Proof. intros. destruct f; (discriminate || reflexivity). Qed.
 
 Fixpoint decompose_prod (t : term) : (list name) * (list term) * term :=
   match t with
-  | tProd n A B => decompose_prod_acc (vass n A :: c) B
-  | _ => (c, t)
+  | tProd n A B =>
+    let (nAs, B) := decompose_prod B in
+    let (ns, As) := nAs in
+    (n :: ns, A :: As, B)
+  | _ => ([], [], t)
   end.
 
 Definition get_ident (n : name) : string :=
@@ -243,23 +246,13 @@ Fixpoint lookup_mind_decl (id : ident) (decls : global_declarations)
 Definition mind_body_to_entry (decl : mutual_inductive_body)
   : mutual_inductive_entry.
 Proof.
-  refine {| mind_entry_record := None; (* not a record *)
+  unshelve refine {| mind_entry_record := None; (* not a record *)
             mind_entry_finite := Finite; (* inductive *)
             mind_entry_params := decl.(ind_params);
             mind_entry_inds := _;
-            mind_entry_universes := decl.(ind_universes);
+            mind_entry_universes := _;
+            mind_entry_variance := decl.(ind_variance);
             mind_entry_private := None |}.
-  - refine (match List.hd_error decl.(ind_bodies) with
-            | Some i0 => List.rev _
-            | None => nil (* assert false: at least one inductive in a mutual block *)
-            end).
-    pose (typ := decompose_prod i0.(ind_type)).
-    destruct typ as [[names types] _].
-    apply (List.firstn decl.(ind_npars)) in names.
-    apply (List.firstn decl.(ind_npars)) in types.
-    refine (List.combine _ _).
-    exact (List.map get_ident names).
-    exact (List.map LocalAssum types).
   - refine (List.map _ decl.(ind_bodies)).
     intros [].
     refine {| mind_entry_typename := ind_name;
@@ -271,6 +264,10 @@ Proof.
     refine (List.map (fun x => fst (fst x)) ind_ctors).
     refine (List.map (fun x => remove_arity decl.(ind_npars)
                                                 (snd (fst x))) ind_ctors).
+  - refine (match decl.(ind_universes) with
+              | Monomorphic_ctx c => Monomorphic_entry c
+              | Polymorphic_ctx c => Polymorphic_entry c
+            end).
 Defined.
 
 Definition arities_context (l : list one_inductive_body) :=
@@ -415,7 +412,6 @@ Definition polymorphic_instance uctx :=
   match uctx with
   | Monomorphic_ctx c => Instance.empty
   | Polymorphic_ctx c => fst (UContext.dest c)
-  | Cumulative_ctx c => fst (UContext.dest (fst c))
   end.
 
 Definition map_one_inductive_body mind u arities f n m :=
@@ -511,12 +507,12 @@ Qed.
 
 Definition map_mutual_inductive_body mind f m :=
   match m with
-  | Build_mutual_inductive_body ind_npars ind_pars ind_bodies ind_universes =>
+  | Build_mutual_inductive_body ind_npars ind_pars ind_bodies ind_universes ind_variances =>
     let arities := arities_context ind_bodies in
     let u := polymorphic_instance ind_universes in
     Build_mutual_inductive_body ind_npars (fold_context f ind_pars)
       (mapi (map_one_inductive_body mind u (length arities) f) ind_bodies)
-      ind_universes
+      ind_universes ind_variances
   end.
 
 Lemma ind_type_map f arities mind u n oib :

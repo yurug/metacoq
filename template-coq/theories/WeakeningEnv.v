@@ -90,7 +90,6 @@ Lemma weakening_env_consistent_universe_context_instance:
 Proof.
   intros Σ u univs H1 Σ' H2. destruct univs; simpl in *; eauto.
   all:(destruct UContext.dest; destruct H2 as [Σ'' ->]; simpl; auto).
-  exact (fst ctx).
 Qed.
 Hint Resolve weakening_env_consistent_universe_context_instance : extends.
 

@@ -456,6 +456,4 @@ End CumulativityInfo.
 
 Inductive universe_context : Type :=
 | Monomorphic_ctx (ctx : UContext.t)
-| Polymorphic_ctx (cst : UContext.t)
-| Cumulative_ctx (ctx : CumulativityInfo.t).
-
+| Polymorphic_ctx (cst : UContext.t).

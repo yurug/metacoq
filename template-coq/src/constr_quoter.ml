@@ -134,14 +134,13 @@ struct
   let tunivLe = resolve_symbol (ext_pkg_univ "ConstraintType") "Le"
   let tunivLt = resolve_symbol (ext_pkg_univ "ConstraintType") "Lt"
   let tunivEq = resolve_symbol (ext_pkg_univ "ConstraintType") "Eq"
-  (* let tunivcontext = resolve_symbol pkg_univ "universe_context" *)
+  let tunivcontext = resolve_symbol pkg_univ "universe_context"
   let tVariance = resolve_symbol pkg_variance "t"
   let cIrrelevant = resolve_symbol pkg_variance "Irrelevant"
   let cCovariant = resolve_symbol pkg_variance "Covariant"
   let cInvariant = resolve_symbol pkg_variance "Invariant"
   let cMonomorphic_ctx = resolve_symbol pkg_univ "Monomorphic_ctx"
   let cPolymorphic_ctx = resolve_symbol pkg_univ "Polymorphic_ctx"
-  let cCumulative_ctx = resolve_symbol pkg_univ "Cumulative_ctx"
   let tUContext = resolve_symbol (ext_pkg_univ "UContext") "t"
   let tUContextmake = resolve_symbol (ext_pkg_univ "UContext") "make"
   (* let tConstraintSetempty = resolve_symbol (ext_pkg_univ "ConstraintSet") "empty" *)
@@ -155,9 +154,6 @@ struct
   let (tLocalDef,tLocalAssum,tlocal_entry) = (r_reify "LocalDef", r_reify "LocalAssum", r_reify "local_entry")
 
   let (cFinite,cCoFinite,cBiFinite) = (r_reify "Finite", r_reify "CoFinite", r_reify "BiFinite")
-  let tUniverses = r_reify "universes"
-  let cMonomorphic = r_reify "Monomorphic"
-  let cPolymorphic = r_reify "Polymorphic"
 
   let tone_inductive_body = r_reify "one_inductive_body"
   let tBuild_one_inductive_body = r_reify "Build_one_inductive_body"
@@ -349,8 +345,8 @@ struct
 
 
   let quote_universes = function
-    | Left c -> Constr.mkApp (cMonomorphic, [| c |])
-    | Right c -> Constr.mkApp (cPolymorphic, [| c |])
+    | Left c -> Constr.mkApp (cMonomorphic_ctx, [| c |])
+    | Right c -> Constr.mkApp (cPolymorphic_ctx, [| c |])
 
   (* let quote_cumulative_univ_context cumi =
    *   let uctx = Univ.CumulativityInfo.univ_context cumi in
