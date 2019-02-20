@@ -1,6 +1,6 @@
---- templateToPCUIC.mli.orig	2018-12-13 13:20:58.000000000 +0100
-+++ templateToPCUIC.mli	2018-12-13 13:21:09.000000000 +0100
-@@ -16,246 +16,7 @@
+--- templateToPCUIC.mli.orig	2019-02-20 01:22:13.000000000 +0100
++++ templateToPCUIC.mli	2019-02-20 01:24:35.000000000 +0100
+@@ -17,786 +17,8 @@
  
  type __ = Obj.t
  
@@ -57,21 +57,119 @@
 -
 -  val isLambda : term -> bool
 -
+-  type context_decl = Ast0.context_decl = { decl_name : name;
+-                                            decl_body : term option;
+-                                            decl_type : term }
+-
+-  val decl_name : context_decl -> name
+-
+-  val decl_body : context_decl -> term option
+-
+-  val decl_type : context_decl -> term
+-
+-  val vass : name -> term -> context_decl
+-
+-  val vdef : name -> term -> term -> context_decl
+-
+-  type context = context_decl list
+-
+-  val snoc : 'a1 list -> 'a1 -> 'a1 list
+-
+-  type one_inductive_body = Ast0.one_inductive_body = { ind_name : ident;
+-                                                        ind_type : term;
+-                                                        ind_kelim : sort_family
+-                                                                    list;
+-                                                        ind_ctors : ((ident * term) * nat)
+-                                                                    list;
+-                                                        ind_projs : (ident * term)
+-                                                                    list }
+-
+-  val ind_name : one_inductive_body -> ident
+-
+-  val ind_type : one_inductive_body -> term
+-
+-  val ind_kelim : one_inductive_body -> sort_family list
+-
+-  val ind_ctors : one_inductive_body -> ((ident * term) * nat) list
+-
+-  val ind_projs : one_inductive_body -> (ident * term) list
+-
+-  type mutual_inductive_body = Ast0.mutual_inductive_body = { ind_npars : 
+-                                                              nat;
+-                                                              ind_params : 
+-                                                              context;
+-                                                              ind_bodies : 
+-                                                              one_inductive_body
+-                                                              list;
+-                                                              ind_universes : 
+-                                                              universe_context;
+-                                                              ind_variance : 
+-                                                              Variance.t list
+-                                                              option }
+-
+-  val ind_npars : mutual_inductive_body -> nat
+-
+-  val ind_params : mutual_inductive_body -> context
+-
+-  val ind_bodies : mutual_inductive_body -> one_inductive_body list
+-
+-  val ind_universes : mutual_inductive_body -> universe_context
+-
+-  val ind_variance : mutual_inductive_body -> Variance.t list option
+-
+-  type constant_body = Ast0.constant_body = { cst_type : term;
+-                                              cst_body : term option;
+-                                              cst_universes : universe_context }
+-
+-  val cst_type : constant_body -> term
+-
+-  val cst_body : constant_body -> term option
+-
+-  val cst_universes : constant_body -> universe_context
+-
+-  type global_decl = Ast0.global_decl =
+-  | ConstantDecl of kername * constant_body
+-  | InductiveDecl of kername * mutual_inductive_body
+-
+-  val global_decl_rect :
+-    (kername -> constant_body -> 'a1) -> (kername -> mutual_inductive_body ->
+-    'a1) -> global_decl -> 'a1
+-
+-  val global_decl_rec :
+-    (kername -> constant_body -> 'a1) -> (kername -> mutual_inductive_body ->
+-    'a1) -> global_decl -> 'a1
+-
+-  type global_declarations = global_decl list
+-
+-  type global_context = global_declarations * t
+-
+-  type program = global_declarations * term
+-
+-  type universes_entry = Ast0.universes_entry =
+-  | Monomorphic_entry of UContext.t
+-  | Polymorphic_entry of UContext.t
+-
+-  val universes_entry_rect :
+-    (UContext.t -> 'a1) -> (UContext.t -> 'a1) -> universes_entry -> 'a1
+-
+-  val universes_entry_rec :
+-    (UContext.t -> 'a1) -> (UContext.t -> 'a1) -> universes_entry -> 'a1
+-
 -  type parameter_entry = Ast0.parameter_entry = { parameter_entry_type : 
 -                                                  term;
 -                                                  parameter_entry_universes : 
--                                                  universe_context }
+-                                                  universes_entry }
 -
 -  val parameter_entry_type : parameter_entry -> term
 -
--  val parameter_entry_universes : parameter_entry -> universe_context
+-  val parameter_entry_universes : parameter_entry -> universes_entry
 -
 -  type definition_entry = Ast0.definition_entry = { definition_entry_type : 
 -                                                    term;
 -                                                    definition_entry_body : 
 -                                                    term;
 -                                                    definition_entry_universes : 
--                                                    universe_context;
+-                                                    universes_entry;
 -                                                    definition_entry_opaque : 
 -                                                    bool }
 -
@@ -79,7 +177,7 @@
 -
 -  val definition_entry_body : definition_entry -> term
 -
--  val definition_entry_universes : definition_entry -> universe_context
+-  val definition_entry_universes : definition_entry -> universes_entry
 -
 -  val definition_entry_opaque : definition_entry -> bool
 -
@@ -134,117 +232,580 @@
 -  val mind_entry_lc : one_inductive_entry -> term list
 -
 -  type mutual_inductive_entry = Ast0.mutual_inductive_entry = { mind_entry_record : 
--                                                                ident option
--                                                                option;
+-                                                                ident list
+-                                                                option option;
 -                                                                mind_entry_finite : 
 -                                                                recursivity_kind;
 -                                                                mind_entry_params : 
--                                                                (ident * local_entry)
--                                                                list;
+-                                                                context;
 -                                                                mind_entry_inds : 
 -                                                                one_inductive_entry
 -                                                                list;
 -                                                                mind_entry_universes : 
--                                                                universe_context;
+-                                                                universes_entry;
+-                                                                mind_entry_variance : 
+-                                                                Variance.t
+-                                                                list option;
 -                                                                mind_entry_private : 
 -                                                                bool option }
 -
--  val mind_entry_record : mutual_inductive_entry -> ident option option
+-  val mind_entry_record : mutual_inductive_entry -> ident list option option
 -
 -  val mind_entry_finite : mutual_inductive_entry -> recursivity_kind
 -
--  val mind_entry_params : mutual_inductive_entry -> (ident * local_entry) list
+-  val mind_entry_params : mutual_inductive_entry -> context
 -
 -  val mind_entry_inds : mutual_inductive_entry -> one_inductive_entry list
 -
--  val mind_entry_universes : mutual_inductive_entry -> universe_context
+-  val mind_entry_universes : mutual_inductive_entry -> universes_entry
+-
+-  val mind_entry_variance : mutual_inductive_entry -> Variance.t list option
 -
 -  val mind_entry_private : mutual_inductive_entry -> bool option
+- end
 -
--  type context_decl = Ast0.context_decl = { decl_name : name;
--                                            decl_body : term option;
--                                            decl_type : term }
+-val trans : T.term -> term
 -
--  val decl_name : context_decl -> name
+-module TTy :
+- sig
+-  val global_decl_ident : Ast0.global_decl -> kername
 -
--  val decl_body : context_decl -> term option
+-  val lookup_env :
+-    Ast0.global_declarations -> ident -> Ast0.global_decl option
 -
--  val decl_type : context_decl -> term
+-  val inds :
+-    kername -> universe_instance -> Ast0.one_inductive_body list -> Ast0.term
+-    list
 -
--  val vass : name -> term -> context_decl
+-  val type_of_constructor :
+-    Ast0.mutual_inductive_body -> ((ident * Ast0.term) * nat) ->
+-    (inductive * nat) -> Level.t list -> Ast0.term
 -
--  val vdef : name -> term -> term -> context_decl
+-  val fix_subst : Ast0.term mfixpoint -> Ast0.term list
 -
--  type context = context_decl list
+-  val unfold_fix : Ast0.term mfixpoint -> nat -> (nat * Ast0.term) option
 -
--  val snoc : 'a1 list -> 'a1 -> 'a1 list
+-  val cofix_subst : Ast0.term mfixpoint -> Ast0.term list
 -
--  type one_inductive_body = Ast0.one_inductive_body = { ind_name : ident;
--                                                        ind_type : term;
--                                                        ind_kelim : sort_family
--                                                                    list;
--                                                        ind_ctors : ((ident * term) * nat)
--                                                                    list;
--                                                        ind_projs : (ident * term)
--                                                                    list }
+-  val unfold_cofix : Ast0.term mfixpoint -> nat -> (nat * Ast0.term) option
 -
--  val ind_name : one_inductive_body -> ident
+-  val is_constructor : nat -> Ast0.term list -> bool
 -
--  val ind_type : one_inductive_body -> term
+-  val fix_context : Ast0.term mfixpoint -> Ast0.context
 -
--  val ind_kelim : one_inductive_body -> sort_family list
+-  val tDummy : Ast0.term
 -
--  val ind_ctors : one_inductive_body -> ((ident * term) * nat) list
+-  val iota_red :
+-    nat -> nat -> Ast0.term list -> (nat * Ast0.term) list -> Ast0.term
 -
--  val ind_projs : one_inductive_body -> (ident * term) list
+-  val eq_term : checker_flags -> t -> Ast0.term -> Ast0.term -> bool
 -
--  type mutual_inductive_body = Ast0.mutual_inductive_body = { ind_npars : 
--                                                              nat;
--                                                              ind_params : 
--                                                              context;
--                                                              ind_bodies : 
--                                                              one_inductive_body
--                                                              list;
--                                                              ind_universes : 
--                                                              universe_context }
+-  val leq_term : checker_flags -> t -> Ast0.term -> Ast0.term -> bool
 -
--  val ind_npars : mutual_inductive_body -> nat
+-  val strip_casts : Ast0.term -> Ast0.term
 -
--  val ind_params : mutual_inductive_body -> context
+-  val eq_term_nocast : checker_flags -> t -> Ast0.term -> Ast0.term -> bool
 -
--  val ind_bodies : mutual_inductive_body -> one_inductive_body list
+-  val leq_term_nocast : checker_flags -> t -> Ast0.term -> Ast0.term -> bool
 -
--  val ind_universes : mutual_inductive_body -> universe_context
+-  val destArity :
+-    Ast0.context_decl list -> Ast0.term -> (Ast0.context_decl
+-    list * universe) option
 -
--  type constant_body = Ast0.constant_body = { cst_type : term;
--                                              cst_body : term option;
--                                              cst_universes : universe_context }
+-  val instantiate_params_subst :
+-    Ast0.context_decl list -> Ast0.term list -> Ast0.term list -> Ast0.term
+-    -> (Ast0.term list * Ast0.term) option
 -
--  val cst_type : constant_body -> term
+-  val instantiate_params :
+-    Ast0.context_decl list -> Ast0.term list -> Ast0.term -> Ast0.term option
 -
--  val cst_body : constant_body -> term option
+-  val build_branches_type :
+-    inductive -> Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    Ast0.term list -> universe_instance -> Ast0.term -> (nat * Ast0.term)
+-    option list
 -
--  val cst_universes : constant_body -> universe_context
+-  val types_of_case :
+-    inductive -> Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    Ast0.term list -> universe_instance -> Ast0.term -> Ast0.term ->
+-    (((Ast0.context_decl list * Ast0.context_decl
+-    list) * universe) * (nat * Ast0.term) list) option
 -
--  type global_decl = Ast0.global_decl =
--  | ConstantDecl of kername * constant_body
--  | InductiveDecl of kername * mutual_inductive_body
+-  val universe_family : (Level.t * bool) list -> sort_family
 -
--  val global_decl_rect :
--    (kername -> constant_body -> 'a1) -> (kername -> mutual_inductive_body ->
--    'a1) -> global_decl -> 'a1
+-  val eq_opt_term :
+-    checker_flags -> t -> Ast0.term option -> Ast0.term option -> bool
 -
--  val global_decl_rec :
--    (kername -> constant_body -> 'a1) -> (kername -> mutual_inductive_body ->
--    'a1) -> global_decl -> 'a1
+-  val eq_decl :
+-    checker_flags -> t -> Ast0.context_decl -> Ast0.context_decl -> bool
 -
--  type global_declarations = global_decl list
+-  val eq_context : checker_flags -> t -> Ast0.context -> Ast0.context -> bool
 -
--  type global_context = global_declarations * t
+-  val check_correct_arity :
+-    checker_flags -> t -> Ast0.one_inductive_body -> inductive ->
+-    universe_instance -> Ast0.context_decl list -> Ast0.term list ->
+-    Ast0.context -> bool
 -
--  type program = global_declarations * term
+-  type 'typing coq_All_local_env = 'typing Typing0.coq_All_local_env =
+-  | Coq_localenv_nil
+-  | Coq_localenv_cons_abs of Ast0.context * name * Ast0.term * universe
+-     * 'typing coq_All_local_env * 'typing
+-  | Coq_localenv_cons_def of Ast0.context * name * Ast0.term * Ast0.term
+-     * 'typing coq_All_local_env * 'typing
+-
+-  val coq_All_local_env_rect :
+-    Ast0.global_context -> 'a2 -> (Ast0.context -> name -> Ast0.term ->
+-    universe -> 'a1 coq_All_local_env -> 'a2 -> 'a1 -> 'a2) -> (Ast0.context
+-    -> name -> Ast0.term -> Ast0.term -> 'a1 coq_All_local_env -> 'a2 -> 'a1
+-    -> 'a2) -> Ast0.context -> 'a1 coq_All_local_env -> 'a2
+-
+-  val coq_All_local_env_rec :
+-    Ast0.global_context -> 'a2 -> (Ast0.context -> name -> Ast0.term ->
+-    universe -> 'a1 coq_All_local_env -> 'a2 -> 'a1 -> 'a2) -> (Ast0.context
+-    -> name -> Ast0.term -> Ast0.term -> 'a1 coq_All_local_env -> 'a2 -> 'a1
+-    -> 'a2) -> Ast0.context -> 'a1 coq_All_local_env -> 'a2
+-
+-  type typing = Typing0.typing =
+-  | Coq_type_Rel of nat * Ast0.context_decl * typing coq_All_local_env
+-  | Coq_type_Sort of Level.t * typing coq_All_local_env
+-  | Coq_type_Cast of Ast0.term * cast_kind * Ast0.term * universe * typing
+-     * typing
+-  | Coq_type_Prod of name * Ast0.term * Ast0.term * universe * universe
+-     * typing * typing
+-  | Coq_type_Lambda of name * name * Ast0.term * Ast0.term * universe
+-     * Ast0.term * typing * typing
+-  | Coq_type_LetIn of name * Ast0.term * Ast0.term * Ast0.term * universe
+-     * Ast0.term * typing * typing * typing
+-  | Coq_type_App of Ast0.term * Ast0.term list * Ast0.term * Ast0.term
+-     * typing * typing_spine
+-  | Coq_type_Const of ident * Level.t list * typing coq_All_local_env
+-     * Ast0.constant_body
+-  | Coq_type_Ind of inductive * Level.t list * typing coq_All_local_env
+-     * Ast0.mutual_inductive_body * Ast0.one_inductive_body
+-  | Coq_type_Construct of inductive * nat * Level.t list
+-     * typing coq_All_local_env * Ast0.mutual_inductive_body
+-     * Ast0.one_inductive_body * ((ident * Ast0.term) * nat)
+-  | Coq_type_Case of inductive * universe_instance * nat * Ast0.term
+-     * Ast0.term * (nat * Ast0.term) list * Ast0.term list
+-     * Ast0.mutual_inductive_body * Ast0.one_inductive_body * Ast0.term
+-     * typing * Ast0.context_decl list * Ast0.context_decl list * universe
+-     * (nat * Ast0.term) list * typing
+-     * (nat * Ast0.term, nat * Ast0.term, __ * typing) coq_All2
+-  | Coq_type_Proj of projection * Ast0.term * universe_instance
+-     * Ast0.mutual_inductive_body * Ast0.one_inductive_body
+-     * (ident * Ast0.term) * Ast0.term list * typing
+-  | Coq_type_Fix of Ast0.term mfixpoint * nat * Ast0.term def
+-     * typing coq_All_local_env * (Ast0.term def, typing * __) coq_All
+-  | Coq_type_CoFix of Ast0.term mfixpoint * nat * Ast0.term def
+-     * typing coq_All_local_env * (Ast0.term def, typing) coq_All
+-  | Coq_type_Conv of Ast0.term * Ast0.term * Ast0.term * universe * typing
+-     * typing
+-  and typing_spine = Typing0.typing_spine =
+-  | Coq_type_spine_nil of Ast0.term
+-  | Coq_type_spine_cons of Ast0.term * Ast0.term list * name * Ast0.term
+-     * Ast0.term * universe * Ast0.term * Ast0.term * typing * typing
+-     * typing_spine
+-
+-  val typing_rect :
+-    checker_flags -> Ast0.global_context -> (Ast0.context -> nat ->
+-    Ast0.context_decl -> typing coq_All_local_env -> __ -> 'a1) ->
+-    (Ast0.context -> Level.t -> typing coq_All_local_env -> 'a1) ->
+-    (Ast0.context -> Ast0.term -> cast_kind -> Ast0.term -> universe ->
+-    typing -> 'a1 -> typing -> 'a1 -> 'a1) -> (Ast0.context -> name ->
+-    Ast0.term -> Ast0.term -> universe -> universe -> typing -> 'a1 -> typing
+-    -> 'a1 -> 'a1) -> (Ast0.context -> name -> name -> Ast0.term -> Ast0.term
+-    -> universe -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> 'a1) ->
+-    (Ast0.context -> name -> Ast0.term -> Ast0.term -> Ast0.term -> universe
+-    -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> typing -> 'a1 -> 'a1)
+-    -> (Ast0.context -> Ast0.term -> Ast0.term list -> Ast0.term -> Ast0.term
+-    -> typing -> 'a1 -> __ -> __ -> typing_spine -> 'a1) -> (Ast0.context ->
+-    ident -> Level.t list -> typing coq_All_local_env -> Ast0.constant_body
+-    -> __ -> __ -> 'a1) -> (Ast0.context -> inductive -> Level.t list ->
+-    typing coq_All_local_env -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> __ -> __ -> 'a1) -> (Ast0.context -> inductive
+-    -> nat -> Level.t list -> typing coq_All_local_env ->
+-    Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    ((ident * Ast0.term) * nat) -> __ -> __ -> 'a1) -> (Ast0.context ->
+-    inductive -> universe_instance -> nat -> Ast0.term -> Ast0.term ->
+-    (nat * Ast0.term) list -> Ast0.term list -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> __ -> __ -> Ast0.term -> typing -> 'a1 ->
+-    Ast0.context_decl list -> Ast0.context_decl list -> universe ->
+-    (nat * Ast0.term) list -> __ -> __ -> __ -> typing -> 'a1 ->
+-    (nat * Ast0.term, nat * Ast0.term, __ * typing) coq_All2 -> 'a1) ->
+-    (Ast0.context -> projection -> Ast0.term -> universe_instance ->
+-    Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    (ident * Ast0.term) -> __ -> Ast0.term list -> typing -> 'a1 -> __ ->
+-    'a1) -> (Ast0.context -> Ast0.term mfixpoint -> nat -> Ast0.term def ->
+-    __ -> typing coq_All_local_env -> (Ast0.term def, typing * __) coq_All ->
+-    'a1) -> (Ast0.context -> Ast0.term mfixpoint -> nat -> Ast0.term def ->
+-    __ -> typing coq_All_local_env -> (Ast0.term def, typing) coq_All -> 'a1)
+-    -> (Ast0.context -> Ast0.term -> Ast0.term -> Ast0.term -> universe ->
+-    typing -> 'a1 -> typing -> 'a1 -> __ -> 'a1) -> Ast0.context -> Ast0.term
+-    -> Ast0.term -> typing -> 'a1
+-
+-  val typing_rec :
+-    checker_flags -> Ast0.global_context -> (Ast0.context -> nat ->
+-    Ast0.context_decl -> typing coq_All_local_env -> __ -> 'a1) ->
+-    (Ast0.context -> Level.t -> typing coq_All_local_env -> 'a1) ->
+-    (Ast0.context -> Ast0.term -> cast_kind -> Ast0.term -> universe ->
+-    typing -> 'a1 -> typing -> 'a1 -> 'a1) -> (Ast0.context -> name ->
+-    Ast0.term -> Ast0.term -> universe -> universe -> typing -> 'a1 -> typing
+-    -> 'a1 -> 'a1) -> (Ast0.context -> name -> name -> Ast0.term -> Ast0.term
+-    -> universe -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> 'a1) ->
+-    (Ast0.context -> name -> Ast0.term -> Ast0.term -> Ast0.term -> universe
+-    -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> typing -> 'a1 -> 'a1)
+-    -> (Ast0.context -> Ast0.term -> Ast0.term list -> Ast0.term -> Ast0.term
+-    -> typing -> 'a1 -> __ -> __ -> typing_spine -> 'a1) -> (Ast0.context ->
+-    ident -> Level.t list -> typing coq_All_local_env -> Ast0.constant_body
+-    -> __ -> __ -> 'a1) -> (Ast0.context -> inductive -> Level.t list ->
+-    typing coq_All_local_env -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> __ -> __ -> 'a1) -> (Ast0.context -> inductive
+-    -> nat -> Level.t list -> typing coq_All_local_env ->
+-    Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    ((ident * Ast0.term) * nat) -> __ -> __ -> 'a1) -> (Ast0.context ->
+-    inductive -> universe_instance -> nat -> Ast0.term -> Ast0.term ->
+-    (nat * Ast0.term) list -> Ast0.term list -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> __ -> __ -> Ast0.term -> typing -> 'a1 ->
+-    Ast0.context_decl list -> Ast0.context_decl list -> universe ->
+-    (nat * Ast0.term) list -> __ -> __ -> __ -> typing -> 'a1 ->
+-    (nat * Ast0.term, nat * Ast0.term, __ * typing) coq_All2 -> 'a1) ->
+-    (Ast0.context -> projection -> Ast0.term -> universe_instance ->
+-    Ast0.mutual_inductive_body -> Ast0.one_inductive_body ->
+-    (ident * Ast0.term) -> __ -> Ast0.term list -> typing -> 'a1 -> __ ->
+-    'a1) -> (Ast0.context -> Ast0.term mfixpoint -> nat -> Ast0.term def ->
+-    __ -> typing coq_All_local_env -> (Ast0.term def, typing * __) coq_All ->
+-    'a1) -> (Ast0.context -> Ast0.term mfixpoint -> nat -> Ast0.term def ->
+-    __ -> typing coq_All_local_env -> (Ast0.term def, typing) coq_All -> 'a1)
+-    -> (Ast0.context -> Ast0.term -> Ast0.term -> Ast0.term -> universe ->
+-    typing -> 'a1 -> typing -> 'a1 -> __ -> 'a1) -> Ast0.context -> Ast0.term
+-    -> Ast0.term -> typing -> 'a1
+-
+-  val typing_spine_rect :
+-    checker_flags -> Ast0.global_context -> (Ast0.context -> Ast0.term ->
+-    'a1) -> (Ast0.context -> Ast0.term -> Ast0.term list -> name -> Ast0.term
+-    -> Ast0.term -> universe -> Ast0.term -> Ast0.term -> typing -> __ ->
+-    typing -> typing_spine -> 'a1 -> 'a1) -> Ast0.context -> Ast0.term ->
+-    Ast0.term list -> Ast0.term -> typing_spine -> 'a1
+-
+-  val typing_spine_rec :
+-    checker_flags -> Ast0.global_context -> (Ast0.context -> Ast0.term ->
+-    'a1) -> (Ast0.context -> Ast0.term -> Ast0.term list -> name -> Ast0.term
+-    -> Ast0.term -> universe -> Ast0.term -> Ast0.term -> typing -> __ ->
+-    typing -> typing_spine -> 'a1 -> 'a1) -> Ast0.context -> Ast0.term ->
+-    Ast0.term list -> Ast0.term -> typing_spine -> 'a1
+-
+-  val add_global_decl :
+-    Ast0.global_decl -> Ast0.global_context -> Ast0.global_decl list * t
+-
+-  val add_global_declarations :
+-    Ast0.global_declarations -> Ast0.global_context -> Ast0.global_context
+-
+-  val reconstruct_global_context :
+-    Ast0.global_declarations -> Ast0.global_context
+-
+-  type isType = (universe, typing) sigT
+-
+-  val context_assumptions : Ast0.context -> nat
+-
+-  type 'p lift_typing = __
+-
+-  type 'p unlift_opt_pred = 'p
+-
+-  type 'p on_type = 'p
+-
+-  type 'p on_arity = 'p on_type * __
+-
+-  type constructor_shape = Typing0.constructor_shape = { cshape_arity : 
+-                                                         Ast0.context;
+-                                                         cshape_args : 
+-                                                         Ast0.term list }
+-
+-  val cshape_arity :
+-    Ast0.mutual_inductive_body -> nat -> Ast0.one_inductive_body ->
+-    ((ident * Ast0.term) * nat) -> constructor_shape -> Ast0.context
+-
+-  val cshape_concl_head :
+-    Ast0.mutual_inductive_body -> nat -> Ast0.one_inductive_body ->
+-    ((ident * Ast0.term) * nat) -> constructor_shape -> Ast0.term
+-
+-  val cshape_args :
+-    Ast0.mutual_inductive_body -> nat -> Ast0.one_inductive_body ->
+-    ((ident * Ast0.term) * nat) -> constructor_shape -> Ast0.term list
+-
+-  type 'p on_constructor = 'p on_type * constructor_shape
+-
+-  type 'p on_constructors =
+-    ((ident * Ast0.term) * nat, 'p on_constructor) coq_Alli
+-
+-  type 'p on_projection = __
+-
+-  type 'p on_projections = (ident * Ast0.term, 'p on_projection) coq_Alli
+-
+-  type 'p on_ind_body = 'p Typing0.on_ind_body = { onArity : 'p on_arity;
+-                                                   onConstructors : 'p
+-                                                                    on_constructors;
+-                                                   onProjections : 'p
+-                                                                   on_projections }
+-
+-  val onArity :
+-    Ast0.global_context -> kername -> Ast0.mutual_inductive_body -> nat ->
+-    Ast0.one_inductive_body -> 'a1 on_ind_body -> 'a1 on_arity
+-
+-  val onConstructors :
+-    Ast0.global_context -> kername -> Ast0.mutual_inductive_body -> nat ->
+-    Ast0.one_inductive_body -> 'a1 on_ind_body -> 'a1 on_constructors
+-
+-  val onProjections :
+-    Ast0.global_context -> kername -> Ast0.mutual_inductive_body -> nat ->
+-    Ast0.one_inductive_body -> 'a1 on_ind_body -> 'a1 on_projections
+-
+-  type 'p on_context = 'p unlift_opt_pred coq_All_local_env
+-
+-  type 'p on_inductive = 'p Typing0.on_inductive = { onInductives : (Ast0.one_inductive_body,
+-                                                                    'p
+-                                                                    on_ind_body)
+-                                                                    coq_Alli;
+-                                                     onParams : 'p on_context }
+-
+-  val onInductives :
+-    Ast0.global_context -> kername -> Ast0.mutual_inductive_body -> 'a1
+-    on_inductive -> (Ast0.one_inductive_body, 'a1 on_ind_body) coq_Alli
+-
+-  val onParams :
+-    Ast0.global_context -> kername -> Ast0.mutual_inductive_body -> 'a1
+-    on_inductive -> 'a1 on_context
+-
+-  type 'p on_constant_decl = __
+-
+-  type 'p on_global_decl = __
+-
+-  type 'p on_global_decls = 'p Typing0.on_global_decls =
+-  | Coq_globenv_nil
+-  | Coq_globenv_decl of Ast0.global_declarations * Ast0.global_decl
+-     * 'p on_global_decls * 'p on_global_decl
+-
+-  val on_global_decls_rect :
+-    (LevelSet.t * ConstraintSet.t) -> (__ -> 'a2) ->
+-    (Ast0.global_declarations -> Ast0.global_decl -> 'a1 on_global_decls ->
+-    'a2 -> __ -> 'a1 on_global_decl -> 'a2) -> Ast0.global_declarations ->
+-    'a1 on_global_decls -> 'a2
+-
+-  val on_global_decls_rec :
+-    (LevelSet.t * ConstraintSet.t) -> (__ -> 'a2) ->
+-    (Ast0.global_declarations -> Ast0.global_decl -> 'a1 on_global_decls ->
+-    'a2 -> __ -> 'a1 on_global_decl -> 'a2) -> Ast0.global_declarations ->
+-    'a1 on_global_decls -> 'a2
+-
+-  type 'p on_global_env = 'p on_global_decls
+-
+-  type 'p sort_irrelevant =
+-    Ast0.global_context -> Ast0.context -> Ast0.term option -> universe ->
+-    universe -> 'p -> 'p
+-
+-  val coq_All_local_env_impl :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> 'a1
+-    coq_All_local_env -> (Ast0.context -> Ast0.term -> Ast0.term -> 'a1 ->
+-    'a2) -> 'a2 coq_All_local_env
+-
+-  val on_global_decls_mix :
+-    Ast0.global_context -> 'a2 sort_irrelevant -> 'a1 on_global_env -> 'a2
+-    on_global_env -> ('a1 * 'a2) on_global_env
+-
+-  val on_global_decls_impl :
+-    checker_flags -> Ast0.global_context -> (Ast0.global_context ->
+-    Ast0.context -> Ast0.term option -> Ast0.term -> 'a1 on_global_env -> 'a1
+-    -> 'a2) -> 'a1 on_global_env -> 'a2 on_global_env
+-
+-  val on_global_decls_proj :
+-    checker_flags -> Ast0.global_context -> ('a1 * 'a2) on_global_env -> 'a1
+-    on_global_env
+-
+-  type type_global_env = typing lift_typing on_global_env
+-
+-  type type_local_decl = __
+-
+-  type 'p all_typing = __
+-
+-  type 'p coq_Forall_decls_typing = 'p lift_typing on_global_env
+-
+-  val on_type_lift_all :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.term ->
+-    (universe, typing) sigT -> (Ast0.term -> 'a1) -> (universe, 'a1) sigT
+-
+-  val refine_type :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.term ->
+-    Ast0.term -> Ast0.term -> typing -> typing
+-
+-  type 'p coq_Forall_typing_spine = 'p Typing0.coq_Forall_typing_spine =
+-  | Forall_type_spine_nil of Ast0.term
+-  | Forall_type_spine_cons of Ast0.term * Ast0.term list * name * Ast0.term
+-     * Ast0.term * universe * Ast0.term * Ast0.term * typing_spine * 
+-     typing * typing * 'p * 'p * 'p coq_Forall_typing_spine
+-
+-  val coq_Forall_typing_spine_rect :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> (Ast0.term ->
+-    'a2) -> (Ast0.term -> Ast0.term list -> name -> Ast0.term -> Ast0.term ->
+-    universe -> Ast0.term -> Ast0.term -> typing_spine -> typing -> __ ->
+-    typing -> 'a1 -> 'a1 -> 'a1 coq_Forall_typing_spine -> 'a2 -> 'a2) ->
+-    Ast0.term -> Ast0.term list -> Ast0.term -> typing_spine -> 'a1
+-    coq_Forall_typing_spine -> 'a2
+-
+-  val coq_Forall_typing_spine_rec :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> (Ast0.term ->
+-    'a2) -> (Ast0.term -> Ast0.term list -> name -> Ast0.term -> Ast0.term ->
+-    universe -> Ast0.term -> Ast0.term -> typing_spine -> typing -> __ ->
+-    typing -> 'a1 -> 'a1 -> 'a1 coq_Forall_typing_spine -> 'a2 -> 'a2) ->
+-    Ast0.term -> Ast0.term list -> Ast0.term -> typing_spine -> 'a1
+-    coq_Forall_typing_spine -> 'a2
+-
+-  val wf_local_size :
+-    checker_flags -> Ast0.global_context -> (Ast0.global_context ->
+-    Ast0.context -> Ast0.term -> Ast0.term -> typing -> size) -> Ast0.context
+-    -> typing coq_All_local_env -> size
+-
+-  val typing_spine_size :
+-    checker_flags -> (Ast0.global_context -> Ast0.context -> Ast0.term ->
+-    Ast0.term -> typing -> size) -> Ast0.global_context -> Ast0.context ->
+-    Ast0.term -> Ast0.term list -> Ast0.term -> typing_spine -> size
+-
+-  val typing_size :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.term ->
+-    Ast0.term -> typing -> size
+-
+-  val globenv_size : Ast0.global_declarations -> size
+-
+-  type 'p env_prop =
+-    Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> Ast0.term -> Ast0.term -> typing -> 'p
+-    coq_Forall_decls_typing * 'p
+-
+-  val env_prop_typing :
+-    checker_flags -> 'a1 env_prop -> Ast0.global_context -> type_global_env
+-    -> Ast0.context -> typing coq_All_local_env -> Ast0.term -> Ast0.term ->
+-    typing -> 'a1
+-
+-  val env_prop_sigma :
+-    checker_flags -> 'a1 env_prop -> Ast0.global_context -> type_global_env
+-    -> 'a1 coq_Forall_decls_typing
+-
+-  val wf_local_app :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.context ->
+-    typing coq_All_local_env -> typing coq_All_local_env
+-
+-  val typing_wf_local :
+-    checker_flags -> Ast0.global_context -> type_global_env -> Ast0.context
+-    -> Ast0.term -> Ast0.term -> typing -> typing coq_All_local_env
+-
+-  val wf_local_inv :
+-    checker_flags -> Ast0.global_context -> Ast0.context_decl ->
+-    Ast0.context_decl list -> typing coq_All_local_env -> (typing
+-    coq_All_local_env, __) sigT
+-
+-  val typing_ind_env :
+-    checker_flags -> (Ast0.global_context -> type_global_env -> Ast0.context
+-    -> typing coq_All_local_env -> nat -> Ast0.context_decl -> __ -> typing
+-    coq_All_local_env -> 'a1 coq_All_local_env -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> Level.t -> typing coq_All_local_env -> 'a1
+-    coq_All_local_env -> 'a1) -> (Ast0.global_context -> type_global_env ->
+-    Ast0.context -> typing coq_All_local_env -> Ast0.term -> cast_kind ->
+-    Ast0.term -> universe -> typing -> 'a1 -> typing -> 'a1 -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> name -> Ast0.term -> Ast0.term -> universe ->
+-    universe -> typing -> 'a1 -> typing -> 'a1 -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> name -> name -> Ast0.term -> Ast0.term -> universe
+-    -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> name -> Ast0.term -> Ast0.term -> Ast0.term ->
+-    universe -> Ast0.term -> typing -> 'a1 -> typing -> 'a1 -> typing -> 'a1
+-    -> 'a1) -> (Ast0.global_context -> type_global_env -> Ast0.context ->
+-    typing coq_All_local_env -> Ast0.term -> Ast0.term list -> Ast0.term ->
+-    Ast0.term -> typing -> 'a1 -> __ -> __ -> typing_spine -> 'a1
+-    coq_Forall_typing_spine -> 'a1) -> (Ast0.global_context ->
+-    type_global_env -> Ast0.context -> typing coq_All_local_env -> ident ->
+-    Level.t list -> Ast0.constant_body -> __ -> 'a1 coq_Forall_decls_typing
+-    -> typing coq_All_local_env -> 'a1 coq_All_local_env -> __ -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> inductive -> Level.t list ->
+-    Ast0.mutual_inductive_body -> Ast0.one_inductive_body -> __ -> 'a1
+-    coq_Forall_decls_typing -> typing coq_All_local_env -> 'a1
+-    coq_All_local_env -> __ -> 'a1) -> (Ast0.global_context ->
+-    type_global_env -> Ast0.context -> typing coq_All_local_env -> inductive
+-    -> nat -> Level.t list -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> ((ident * Ast0.term) * nat) -> __ -> 'a1
+-    coq_Forall_decls_typing -> typing coq_All_local_env -> 'a1
+-    coq_All_local_env -> __ -> 'a1) -> (Ast0.global_context ->
+-    type_global_env -> Ast0.context -> typing coq_All_local_env -> inductive
+-    -> universe_instance -> nat -> Ast0.term -> Ast0.term ->
+-    (nat * Ast0.term) list -> Ast0.term list -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> __ -> 'a1 coq_Forall_decls_typing -> __ ->
+-    Ast0.term -> typing -> 'a1 -> Ast0.context_decl list -> Ast0.context_decl
+-    list -> universe -> (nat * Ast0.term) list -> __ -> __ -> __ -> 'a1 ->
+-    typing -> 'a1 -> (nat * Ast0.term, nat * Ast0.term, (__ * typing) * 'a1)
+-    coq_All2 -> 'a1) -> (Ast0.global_context -> type_global_env ->
+-    Ast0.context -> typing coq_All_local_env -> projection -> Ast0.term ->
+-    universe_instance -> Ast0.mutual_inductive_body ->
+-    Ast0.one_inductive_body -> (ident * Ast0.term) -> __ -> Ast0.term list ->
+-    'a1 coq_Forall_decls_typing -> typing -> 'a1 -> __ -> 'a1) ->
+-    (Ast0.global_context -> type_global_env -> Ast0.context -> typing
+-    coq_All_local_env -> Ast0.term def list -> nat -> Ast0.term def -> __ ->
+-    (typing * 'a1) coq_All_local_env -> (Ast0.term def, (typing * __) * 'a1)
+-    coq_All -> 'a1) -> (Ast0.global_context -> type_global_env ->
+-    Ast0.context -> typing coq_All_local_env -> Ast0.term def list -> nat ->
+-    Ast0.term def -> __ -> (typing * 'a1) coq_All_local_env -> (Ast0.term
+-    def, typing * 'a1) coq_All -> 'a1) -> (Ast0.global_context ->
+-    type_global_env -> Ast0.context -> typing coq_All_local_env -> Ast0.term
+-    -> Ast0.term -> Ast0.term -> universe -> typing -> 'a1 -> typing -> 'a1
+-    -> __ -> 'a1) -> 'a1 env_prop
+-
+-  type 'p on_local_decl = __
+-
+-  val nth_error_All_local_env :
+-    Ast0.global_context -> Ast0.context_decl list -> nat -> 'a1
+-    coq_All_local_env -> (Ast0.context_decl, 'a1 on_local_decl) on_some
+-
+-  val lookup_on_global_env :
+-    Ast0.global_context -> ident -> Ast0.global_decl -> 'a1 on_global_env ->
+-    (Ast0.global_context, ('a1 on_global_env, 'a1 on_global_decl) sigT) sigT
+-
+-  val coq_All_local_env_app :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.context ->
+-    'a1 coq_All_local_env -> 'a1 coq_All_local_env * 'a1 coq_All_local_env
+-
+-  val coq_All_local_env_lookup :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> nat ->
+-    Ast0.context_decl -> 'a1 coq_All_local_env -> 'a1 on_local_decl
+-
+-  val coq_All_local_env_app_inv :
+-    checker_flags -> Ast0.global_context -> Ast0.context -> Ast0.context ->
+-    ('a1 coq_All_local_env * 'a1 coq_All_local_env) -> 'a1 coq_All_local_env
+-
+-  val coq_All_local_env_map :
+-    checker_flags -> Ast0.global_context -> (Ast0.term -> Ast0.term) ->
+-    Ast0.context -> 'a1 coq_All_local_env -> 'a1 coq_All_local_env
 - end
 +module T = Ast0
++module TTy = Typing0
  
- val trans : T.term -> term
+ val trans_decl : T.context_decl -> context_decl
+ 
+@@ -814,18 +36,7 @@
+ 
+ val trans_global : T.global_context -> global_decl list * t
+ 
+-module TL :
+- sig
+-  val lift : nat -> nat -> Ast0.term -> Ast0.term
+-
+-  val up : Ast0.term -> Ast0.term
+-
+-  val subst : Ast0.term list -> nat -> Ast0.term -> Ast0.term
+-
+-  val subst1 : Ast0.term -> nat -> Ast0.term -> Ast0.term
+-
+-  val closedn : nat -> Ast0.term -> bool
+- end
++module TL = LiftSubst
+ 
+ val on_pair : ('a1 -> 'a2) -> ('a3 -> 'a4) -> ('a1 * 'a3) -> 'a2 * 'a4
  
