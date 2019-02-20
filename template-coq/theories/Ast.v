@@ -60,11 +60,11 @@ Inductive term : Set :=
         (discr:term) (branches : list (nat * term))
 | tProj (proj : projection) (t : term)
 | tFix (mfix : mfixpoint term) (idx : nat)
-| tCoFix (mfix : mfixpoint term) (idx : nat)
-| tInt (i : Int63.int).
+| tCoFix (mfix : mfixpoint term) (idx : nat).
+(* | tInt (i : Int63.int). *)
 
 (** Primitive integers type, as defined in the standard library. *)
-Definition tInt_type := tConst "Coq.Numbers.Cyclic.Int63.Int63.int"%string [].
+(* Definition tInt_type := tConst "Coq.Numbers.Cyclic.Int63.Int63.int"%string []. *)
 
 Definition mkApps t us :=
   match us with
@@ -109,8 +109,8 @@ Inductive wf : term -> Prop :=
 | wf_tProj p t : wf t -> wf (tProj p t)
 | wf_tFix mfix k : Forall (fun def => wf def.(dtype) /\ wf def.(dbody) /\ isLambda def.(dbody) = true) mfix ->
                    wf (tFix mfix k)
-| wf_tCoFix mfix k : Forall (fun def => wf def.(dtype) /\ wf def.(dbody)) mfix -> wf (tCoFix mfix k)
-| wf_tInt i : wf (tInt i).
+| wf_tCoFix mfix k : Forall (fun def => wf def.(dtype) /\ wf def.(dbody)) mfix -> wf (tCoFix mfix k).
+(* | wf_tInt i : wf (tInt i). *)
 
 (** ** Declarations *)
 

@@ -426,11 +426,11 @@ Definition string_of_def {A : Set} (f : A -> string) (def : def A) :=
 Definition string_of_inductive (i : inductive) :=
   (inductive_mind i) ++ "," ++ string_of_nat (inductive_ind i).
 
-Definition string_of_int (t : Int63.int) := "" (* TOOD *).
+(* Definition string_of_int (t : Int63.int) := "" (* TOOD *). *)
 
 Fixpoint string_of_term (t : term) :=
   match t with
-  | tInt n => "Int(" ++ string_of_int n ++ ")"
+  (* | tInt n => "Int(" ++ string_of_int n ++ ")" *)
   | tRel n => "Rel(" ++ string_of_nat n ++ ")"
   | tVar n => "Var(" ++ n ++ ")"
   | tMeta n => "Meta(" ++ string_of_nat n ++ ")"
@@ -672,7 +672,7 @@ Section Typecheck2.
 
   Fixpoint infer (Γ : context) (t : term) : typing_result term :=
     match t with
-    | tInt i => ret tInt_type
+    (* | tInt i => ret tInt_type *)
     | tRel n =>
       match nth_error Γ n with
       | Some d => ret (lift0 (S n) d.(decl_type))

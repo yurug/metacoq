@@ -12,7 +12,7 @@ Module T := Template.Ast.
 
 Fixpoint trans (t : T.term) : term :=
   match t with
-  | T.tInt i => tInt i
+  (* | T.tInt i => tInt i *)
   | T.tRel n => tRel n
   | T.tVar n => tVar n
   | T.tMeta n => tMeta n

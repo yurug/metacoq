@@ -34,7 +34,7 @@ Section TypeOf.
 
   Fixpoint type_of (Γ : context) (t : term) : typing_result term :=
     match t with
-    | tInt i => ret tInt_type
+    (* | tInt i => ret tInt_type *)
     | tRel n =>
       match nth_error Γ n with
       | Some d => ret (lift0 (S n) d.(decl_type))

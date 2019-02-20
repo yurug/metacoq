@@ -1239,7 +1239,7 @@ Proof.
     induction m. reflexivity.
     inv H0. intuition.
     simpl. rewrite H0 H3. simpl. apply H1.
-  - now apply Int63.eqb_spec.
+  (* - now apply Int63.eqb_spec. *)
 Qed.
 
 Lemma eq_term_leq_term `{checker_flags} φ t u : eq_term φ t u = true -> leq_term φ t u = true.

@@ -29,11 +29,11 @@ Inductive term : Set :=
                -> term (* discriminee *) -> list (nat * term) (* branches *) -> term
 | tProj      : projection -> term -> term
 | tFix       : mfixpoint term -> nat -> term
-| tCoFix     : mfixpoint term -> nat -> term
-| tInt       : Int63.int -> term.
+| tCoFix     : mfixpoint term -> nat -> term.
+(* | tInt       : Int63.int -> term. *)
 
 (** Primitive integers type, as defined in the standard library. *)
-Definition tInt_type := tConst "Coq.Numbers.Cyclic.Int63.Int63.int"%string [].
+(* Definition tInt_type := tConst "Coq.Numbers.Cyclic.Int63.Int63.int"%string []. *)
 
 Fixpoint mkApps t us :=
   match us with
