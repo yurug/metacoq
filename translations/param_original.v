@@ -153,6 +153,7 @@ Definition tsl_mind_body (E : tsl_table) (mp : string) (kn : kername)
       (* [I_n-1; ... I_0] *)
       refine (rev (map_i (fun i _ => tInd (mkInd kn i) [])
                               mind.(ind_bodies))).
+  - exact None.
 Defined.
 
 

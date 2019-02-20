@@ -156,7 +156,7 @@ Definition tsl_mind_body (ΣE : tsl_context) (mp : string)
            (kn : kername) (mind : mutual_inductive_body)
   : tsl_result (tsl_table * list mutual_inductive_body).
   refine (let tsl_ty' := tsl_ty_param fuel (fst ΣE) (snd ΣE) [] in _).
-  refine (let tsl2' := tsl_rec2 fuel (fst ΣE) (snd ΣE) [] in
+  refine (let tsl2' := tsl_rec2 fuel (fst ΣE) (snd ΣE) in
           let kn' := tsl_kn tsl_ident kn mp in _).
   simple refine (let arities := List.map ind_type mind.(ind_bodies) in
                  arities2 <- monad_map (tsl2' []) arities ;;
@@ -211,7 +211,7 @@ Definition tsl_mind_body (ΣE : tsl_context) (mp : string)
       (* refine (fold_left_i (fun E k _ => _ :: E) ind.(ind_ctors) []). *)
       (* exact (ConstructRef (mkInd id i) k, tConstruct (mkInd id' i) k []). *)
       refine [].
-  - (* FIXME don't know what to do *) refine (mind.(ind_params)).
+  - (* FIXME don't know what to do *) refine (mind.(ind_variance)).
 Defined.
 
 
