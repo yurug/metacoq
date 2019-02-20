@@ -132,7 +132,8 @@ Definition mut_i : mutual_inductive_entry :=
   mind_entry_finite := Finite;
   mind_entry_params := [];
   mind_entry_inds := [one_i; one_i2];
-  mind_entry_universes := Monomorphic_ctx ([], ConstraintSet.empty);
+  mind_entry_universes := Monomorphic_entry ([], ConstraintSet.empty);
+  mind_entry_variance := None;
   mind_entry_private := None;
 |}.
 
@@ -157,9 +158,10 @@ Definition mut_list_i : mutual_inductive_entry :=
 {|
   mind_entry_record := None;
   mind_entry_finite := Finite;
-  mind_entry_params := [("A", LocalAssum (tSort Universe.type0))];
+  mind_entry_params := [vass (nNamed "A") (tSort Universe.type0)];
   mind_entry_inds := [one_list_i];
-  mind_entry_universes := Monomorphic_ctx ([], ConstraintSet.empty);
+  mind_entry_universes := Monomorphic_entry ([], ConstraintSet.empty);
+  mind_entry_variance := None;
   mind_entry_private := None;
 |}.
 
@@ -180,11 +182,12 @@ Definition one_pt_i : one_inductive_entry :=
 
 Definition mut_pt_i : mutual_inductive_entry :=
 {|
-  mind_entry_record := Some (Some ["pp"]);
+  mind_entry_record := Some (Some ["pp"%string]);
   mind_entry_finite := BiFinite;
-  mind_entry_params := [("A", LocalAssum (tSort Universe.type0))];
+  mind_entry_params := [vass (nNamed "A") (tSort Universe.type0)];
   mind_entry_inds := [one_pt_i];
-  mind_entry_universes := Monomorphic_ctx ([], ConstraintSet.empty);
+  mind_entry_universes := Monomorphic_entry ([], ConstraintSet.empty);
+  mind_entry_variance := None;
   mind_entry_private := None;
 |}.
 
@@ -220,7 +223,6 @@ Definition six : nat.
 Qed.
 Run TemplateProgram ((tmQuoteConstant "six" true) >>= tmPrint).
 Run TemplateProgram ((tmQuoteConstant "six" false) >>= tmPrint).
-
 
 Run TemplateProgram (t <- tmLemma "foo4" nat ;;
                      tmDefinition "foo5" (t + t + 2)).

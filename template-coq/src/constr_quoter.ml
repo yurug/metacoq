@@ -7,7 +7,6 @@ open Quoter
 
 let contrib_name = "template-coq"
 
-[@@ocaml.warnings "-3"]
 let gen_constant_in_modules locstr dirs s =
   UnivGen.constr_of_monomorphic_global (Coqlib.gen_reference_in_modules locstr dirs s)
 
@@ -364,7 +363,7 @@ struct
   let quote_abstract_univ_context_aux uctx =
     let inst = Univ.UContext.instance uctx in
     let const = Univ.UContext.constraints uctx in
-    Constr.mkApp (cPolymorphic_ctx, [| quote_ucontext inst const |])
+    quote_ucontext inst const
 
   let quote_abstract_univ_context uctx =
     let uctx = Univ.AUContext.repr uctx in

@@ -81,24 +81,24 @@ ind_bodies := [{|
                                         (tSort [(Level.Var 1, false)]))) 
                                   (tRel 2)), 2)];
                ind_projs := [] |}];
-ind_universes := Cumulative_ctx
+ind_universes := Polymorphic_ctx
                    ([Level.Level "Top.275"; Level.Level "Top.276"],
                    {|
                    ConstraintSet.this := [];
-                   ConstraintSet.is_ok := ConstraintSet.Raw.empty_ok |},
-                   [Variance.Covariant; Variance.Covariant]) |}).
+                   ConstraintSet.is_ok := ConstraintSet.Raw.empty_ok |});
+ind_variance := Some [Variance.Covariant; Variance.Covariant] |}).
 
 Fail Make Inductive {|
        mind_entry_record := None;
        mind_entry_finite := Finite;
        mind_entry_params := [];
        mind_entry_inds := [{|
-                           mind_entry_typename := "Category";
+                           mind_entry_typename := "Category'";
                            mind_entry_arity := tSort
                                                  [(Level.Level "Top.275", true);
                                                  (Level.Level "Top.276", true)];
                            mind_entry_template := false;
-                           mind_entry_consnames := ["Build_Category"];
+                           mind_entry_consnames := ["Build_Category'"];
                            mind_entry_lc := [tProd (nNamed "Obj")
                                                (tSort [(Level.Var 0, false)])
                                                (tProd 
@@ -109,12 +109,12 @@ Fail Make Inductive {|
                                                      (tRel 1)
                                                      (tSort [(Level.Var 1, false)])))
                                                   (tRel 2))] |}];
-       mind_entry_universes := Cumulative_ctx
+       mind_entry_universes := Polymorphic_entry
                                  ([Level.Level "Top.275"; Level.Level "Top.276"],
                                  {|
                                  ConstraintSet.this := [];
-                                 ConstraintSet.is_ok := ConstraintSet.Raw.empty_ok |},
-                                 [Variance.Covariant; Variance.Covariant]);
+                                 ConstraintSet.is_ok := ConstraintSet.Raw.empty_ok |});
+       mind_entry_variance := Some [Variance.Covariant; Variance.Covariant];
        mind_entry_private := None |}.
 
 
@@ -220,7 +220,6 @@ Section test.
   
 End test.
 
-Compute t.
 Compute (@t Type@{i} Type@{j}).
 (* Compute (@t@{i j i j}). *)
 
