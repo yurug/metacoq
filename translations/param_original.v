@@ -156,7 +156,7 @@ Definition tsl_mind_body (E : tsl_table) (mp : string) (kn : kername)
   - exact None.
 Defined.
 
-
+(*
 (* Run TemplateProgram (typ <- tmQuote (forall A, A -> A) ;; *)
 (*                      typ' <- tmEval all (tsl_rec1 [] typ) ;; *)
 (*                      tm <- tmQuote (fun A (x : A) => x) ;; *)
@@ -454,7 +454,7 @@ Module Axioms.
     apply X; intros []. reflexivity.
   Defined.
 End Axioms.
-
+*)
 
 
 
