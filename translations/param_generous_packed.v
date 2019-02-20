@@ -149,7 +149,7 @@ Notation "'El' A" := (@sigT A.1 A.2) (at level 20).
 
 Definition Ty := Type.
 Run TemplateProgram (Translate emptyTC "Ty").
-Check Tyᵗ : El Tyᵗ.
+(* Check Tyᵗ : El Tyᵗ. *)
 
 
 

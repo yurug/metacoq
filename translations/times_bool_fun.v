@@ -263,7 +263,7 @@ Defined.
 Definition UIP := forall A (x y : A) (p q : x = y), p = q.
 
 
-Run TemplateProgram (tmQuoteRec UIP >>= tmPrint).
+(* Run TemplateProgram (tmQuoteRec UIP >>= tmPrint). *)
 
 Run TemplateProgram (TC <- TranslateRec TC UIP ;;
                      tmDefinition "eqTC" TC).

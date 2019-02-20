@@ -82,8 +82,7 @@ Definition tsl_name tsl_ident n :=
 
 
 Definition tmDebug {A} : A -> TemplateMonad unit
-  := tmPrint.
-  (* := fun _ => ret tt. *)
+  := fun _ => ret tt.
 
 Definition universes_of_entry (u : universes_entry) : universe_context :=
   match u with
@@ -160,7 +159,6 @@ Definition Implement {tsl : Translation} (ΣE : tsl_context)
   | None => tmFail "No implementation of tsl_ty provided for this translation."
   | Some tsl_ty => 
   tA' <- tmEval lazy (tsl_ty ΣE tA) ;;
-  print_nf tA' ;;
   match tA' with
   | Error e =>
     print_nf e ;;
