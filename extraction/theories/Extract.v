@@ -198,7 +198,7 @@ Definition extract_global `{F : Fuel} Σ :=
    which is indifferent to the extractd parts.
  *)
 
-Fixpoint inductive_arity (t : term) :=
+Definition inductive_arity (t : term) :=
   match t with
   | tApp f _ | f =>
     match f with

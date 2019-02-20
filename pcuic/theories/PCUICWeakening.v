@@ -179,7 +179,7 @@ Proof.
   generalize #|mfix| at 2 3. induction n0; auto. simpl.
   f_equal. apply IHn0.
 Qed.
-Hint Resolve lift_unfold_cofix.
+Hint Resolve lift_unfold_cofix : core.
 
 Lemma decompose_app_rec_lift n k t l :
   let (f, a) := decompose_app_rec t l in
@@ -211,7 +211,7 @@ Proof.
   destruct decompose_app eqn:Heq. eapply decompose_app_lift in Heq as ->.
   destruct t0; try discriminate || reflexivity.
 Qed.
-Hint Resolve lift_is_constructor.
+Hint Resolve lift_is_constructor : core.
 
 Hint Rewrite lift_subst_instance_constr : lift.
 Hint Rewrite lift_mkApps : lift.
