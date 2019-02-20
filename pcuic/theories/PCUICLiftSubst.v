@@ -320,8 +320,8 @@ Proof. destruct bod; simpl; try congruence. Qed.
 
 Hint Resolve lift_isApp map_non_nil isLambda_lift : all.
 
-Hint Unfold compose.
-Hint Transparent compose.
+Hint Unfold compose : core.
+Hint Transparent compose : core.
 
 Lemma simpl_subst_rec :
   forall M N n p k,

@@ -164,7 +164,7 @@ Proof.
   generalize #|mfix| at 2 3. induction n0; auto. simpl.
   f_equal. apply IHn0.
 Qed.
-Hint Resolve lift_unfold_fix.
+Hint Resolve lift_unfold_fix : core.
 
 Lemma lift_unfold_cofix n k mfix idx narg fn :
   unfold_cofix mfix idx = Some (narg, fn) ->
