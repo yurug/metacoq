@@ -121,7 +121,7 @@ module type Quoter = sig
   type quoted_univ_instance
   type quoted_univ_constraints
   type quoted_univ_context
-  type quoted_variance_info
+  type quoted_variance
 
   type quoted_universes_entry
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
@@ -159,7 +159,7 @@ module type Quoter = sig
   val quote_univ_instance : Univ.Instance.t -> quoted_univ_instance
   val quote_univ_constraints : Univ.Constraint.t -> quoted_univ_constraints
   val quote_univ_context : Univ.UContext.t -> quoted_univ_context
-  val quote_variance : Univ.Variance.t array option -> quoted_variance_info
+  val quote_variance : Univ.Variance.t array option -> quoted_variance
   val quote_abstract_univ_context : Univ.AUContext.t -> quoted_univ_context
   val quote_universes_entry : universes_entry -> quoted_universes_entry
   val quote_universes : (quoted_univ_context, quoted_univ_context) sum -> quoted_universes
@@ -167,7 +167,7 @@ module type Quoter = sig
   val quote_mind_finiteness : Declarations.recursivity_kind -> quoted_mind_finiteness
   val quote_mutual_inductive_entry :
     quoted_mind_finiteness * quoted_context * quoted_ind_entry list *
-    quoted_universes_entry ->
+    quoted_universes_entry * quoted_variance ->
     quoted_mind_entry
 
   val quote_entry : (quoted_definition_entry, quoted_mind_entry) sum option -> quoted_entry
@@ -210,7 +210,7 @@ module type Quoter = sig
     -> quoted_context (* parameters context with lets *)
     -> quoted_one_inductive_body list
     -> quoted_universes
-    -> quoted_variance_info
+    -> quoted_variance
     -> quoted_mutual_inductive_body
 
   val mk_constant_body : t (* type *) -> t option (* body *) -> quoted_universes -> quoted_constant_body
@@ -605,7 +605,8 @@ since  [absrt_info] is a private type *)
     let envA = Environ.push_rel_context t.mind_entry_params env in
     let is = List.map (quote_one_ind envA envC) t.mind_entry_inds in
     let uctx = Q.quote_universes_entry t.mind_entry_universes in
-    Q.quote_mutual_inductive_entry (mf, mp, is, uctx)
+    let variance = Q.quote_variance t.mind_entry_variance in
+    Q.quote_mutual_inductive_entry (mf, mp, is, uctx, variance)
 
   let quote_entry_aux bypass env evm (name:string) =
     let (dp, nm) = split_name name in

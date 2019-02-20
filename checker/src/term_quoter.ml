@@ -28,6 +28,7 @@ struct
   type t = term
   type quoted_ident = char list
   type quoted_int = Datatypes.nat
+  type quoted_uint63 = Uint63.t
   type quoted_bool = bool
   type quoted_name = name
   type quoted_sort = Univ0.universe
@@ -42,17 +43,21 @@ struct
   type quoted_univ_constraint = Univ0.univ_constraint
   type quoted_univ_instance = Univ0.Instance.t
   type quoted_univ_constraints = Univ0.constraints
-  type quoted_univ_context = Univ0.universe_context
+  type quoted_univ_context = Univ0.UContext.t
   type quoted_inductive_universes = quoted_univ_context
 
+  type quoted_universes_entry = universes_entry
+  type quoted_variance = Univ0.Variance.t list option
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
-  type quoted_definition_entry = t * t option * quoted_univ_context
+  type quoted_definition_entry = t * t option * quoted_universes_entry
   type quoted_mind_entry = mutual_inductive_entry
   type quoted_mind_finiteness = recursivity_kind
   type quoted_entry = (constant_entry, quoted_mind_entry) sum option
 
   type quoted_context_decl = context_decl
   type quoted_context = context
+
+  type quoted_universes = Univ0.universe_context
   type quoted_one_inductive_body = one_inductive_body
   type quoted_mutual_inductive_body = mutual_inductive_body
   type quoted_constant_body = constant_body
@@ -129,43 +134,40 @@ struct
     let l = List.map quote_univ_constraint (Univ.Constraint.elements c) in
     Univ0.ConstraintSet.(List.fold_right add l empty)
 
-  let quote_variance (v : Univ.Variance.t) =
+  let quote_one_variance (v : Univ.Variance.t) =
     match v with
     | Univ.Variance.Irrelevant -> Univ0.Variance.Irrelevant
     | Univ.Variance.Covariant -> Univ0.Variance.Covariant
     | Univ.Variance.Invariant -> Univ0.Variance.Invariant
 
-  let quote_cuminfo_variance (var : Univ.Variance.t array) =
-    CArray.map_to_list quote_variance var
+  let quote_variance_array (var : Univ.Variance.t array) =
+    CArray.map_to_list quote_one_variance var
 
-  let quote_univ_context (uctx : Univ.UContext.t) : quoted_univ_context =
+  let quote_variance (var : Univ.Variance.t array option) =
+    Option.map quote_variance_array var
+
+  let quote_univ_context (uctx : Univ.UContext.t) =
     let levels = Univ.UContext.instance uctx  in
     let constraints = Univ.UContext.constraints uctx in
-    Univ0.Monomorphic_ctx (quote_univ_instance levels, quote_univ_constraints constraints)
+    (quote_univ_instance levels, quote_univ_constraints constraints)
 
-  let quote_cumulative_univ_context (cumi : Univ.CumulativityInfo.t) : quoted_univ_context =
-    let uctx = Univ.CumulativityInfo.univ_context cumi in
-    let levels = Univ.UContext.instance uctx  in
-    let constraints = Univ.UContext.constraints uctx in
-    let var = Univ.CumulativityInfo.variance cumi in
-    let uctx' = (quote_univ_instance levels, quote_univ_constraints constraints) in
-    let var' = quote_cuminfo_variance var in
-    Univ0.Cumulative_ctx (uctx', var')
+  (* let quote_cumulative_univ_context (cumi : Univ.CumulativityInfo.t) : quoted_univ_context =
+   *   let uctx = Univ.CumulativityInfo.univ_context cumi in
+   *   let levels = Univ.UContext.instance uctx  in
+   *   let constraints = Univ.UContext.constraints uctx in
+   *   let var = Univ.CumulativityInfo.variance cumi in
+   *   let uctx' = (quote_univ_instance levels, quote_univ_constraints constraints) in
+   *   let var' = quote_cuminfo_variance var in
+   *   Univ0.Cumulative_ctx (uctx', var') *)
 
   let quote_abstract_univ_context_aux uctx : quoted_univ_context =
     let levels = Univ.UContext.instance uctx in
     let constraints = Univ.UContext.constraints uctx in
-    Univ0.Polymorphic_ctx (quote_univ_instance levels, quote_univ_constraints constraints)
+    (quote_univ_instance levels, quote_univ_constraints constraints)
 
   let quote_abstract_univ_context (uctx : Univ.AUContext.t) =
     let uctx = Univ.AUContext.repr uctx in
     quote_abstract_univ_context_aux uctx
-
-  let quote_inductive_universes = function
-    | Entries.Monomorphic_ind_entry ctx -> quote_univ_context (Univ.ContextSet.to_context ctx)
-    | Entries.Polymorphic_ind_entry (na, ctx) -> quote_abstract_univ_context_aux ctx
-    | Entries.Cumulative_ind_entry (na, ctx) ->
-      quote_abstract_univ_context_aux (Univ.CumulativityInfo.univ_context ctx)
 
   let quote_context_decl na b t =
     { decl_name = na;
@@ -224,14 +226,18 @@ struct
     let branches = List.map2 (fun br nargs ->  (nargs, br)) brs nargs in
     Coq_tCase (info,p,c,branches)
   let mkProj p c = Coq_tProj (p,c)
+  let mkInt x = failwith "Primitive integers not supported"
+
+  let quote_uint63 x = x
 
   let mk_one_inductive_body (id, ty, kel, ctr, proj) =
     let ctr = List.map (fun (a, b, c) -> ((a, b), c)) ctr in
     { ind_name = id; ind_type = ty;
       ind_kelim = kel; ind_ctors = ctr; ind_projs = proj }
 
-  let mk_mutual_inductive_body npars params inds uctx =
-    {ind_npars = npars; ind_params = params; ind_bodies = inds; ind_universes = uctx}
+  let mk_mutual_inductive_body npars params inds uctx variance =
+    {ind_npars = npars; ind_params = params; ind_bodies = inds; ind_universes = uctx;
+     ind_variance = variance}
 
   let mk_constant_body ty tm uctx =
     {cst_type = ty; cst_body = tm; cst_universes = uctx}
@@ -251,6 +257,17 @@ struct
     | Declarations.CoFinite -> CoFinite
     | Declarations.BiFinite -> BiFinite
 
+  let mk_polymorphic_entry uctx =
+    Polymorphic_entry uctx
+
+  let mk_monomorphic_entry uctx =
+    Monomorphic_entry uctx
+
+  let quote_universes_entry = function
+    | Entries.Monomorphic_entry ctx -> Monomorphic_entry (quote_univ_context (Univ.ContextSet.to_context ctx))
+    | Entries.Polymorphic_entry (nas, ctx) -> Polymorphic_entry (quote_univ_context ctx)
+
+
   let quote_one_inductive_entry (id, ar, b, consnames, constypes) =
     { mind_entry_typename = id;
       mind_entry_arity = ar;
@@ -258,13 +275,24 @@ struct
       mind_entry_consnames = consnames;
       mind_entry_lc = constypes }
 
-  let quote_mutual_inductive_entry (mf, mp, is, univs) =
+  let quote_mutual_inductive_entry (mf, mp, is, univs, variance) =
     { mind_entry_record = None;
       mind_entry_finite = mf;
       mind_entry_params = mp;
       mind_entry_inds = List.map quote_one_inductive_entry is;
       mind_entry_universes = univs;
+      mind_entry_variance = variance;
       mind_entry_private = None }
+
+  let aucontext_of_context c =
+    let inst = Univ.UContext.instance c in
+    let nas = Array.map (fun _ -> Anonymous) (Univ.Instance.to_array inst) in
+    snd (Univ.abstract_universes nas c)
+
+  let quote_universes x =
+    match x with
+    | Left ctx -> Univ0.Monomorphic_ctx ctx
+    | Right uctx -> Univ0.Polymorphic_ctx uctx
 
   let quote_entry e =
     match e with
@@ -343,7 +371,8 @@ struct
       let last, dp = CList.sep_last comps in
       let dp = DirPath.make (List.map Id.of_string comps) in
       let idx = int_of_string last in
-      Univ.Level.make dp idx
+      let lvl = Univ.Level.UGlobal.make dp idx in
+      Univ.Level.make lvl
     | Univ0.Level.Var n -> Univ.Level.var (unquote_int n)
 
   let unquote_level_expr (trm : Univ0.Level.t) (b : quoted_bool) : Univ.Universe.t =

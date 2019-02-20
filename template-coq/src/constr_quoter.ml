@@ -34,7 +34,7 @@ struct
   type quoted_univ_constraints = Constr.t (* of type univ.constraints *)
   type quoted_univ_instance = Constr.t (* of type univ.universe_instance *)
   type quoted_univ_context = Constr.t (* of type univ.universe_context *)
-  type quoted_variance_info = Constr.t (* of type option list Variance.t *)
+  type quoted_variance = Constr.t (* of type option list Variance.t *)
 
   type quoted_universes_entry = Constr.t (* of type Ast.universes_entry *)
   type quoted_ind_entry = quoted_ident * t * quoted_bool * quoted_ident list * t list
@@ -121,12 +121,12 @@ struct
   let tsort_family = r_base_reify "sort_family"
   let tmkdecl = r_reify "mkdecl"
   let (tTerm,tRel,tVar,tMeta,tEvar,tSort,tCast,tProd,
-       tLambda,tLetIn,tApp,tCase,tFix,tConstructor,tConst,tInd,tCoFix,tProj,tInt) =
+       tLambda,tLetIn,tApp,tCase,tFix,tConstructor,tConst,tInd,tCoFix,tProj) =
     (r_reify "term", r_reify "tRel", r_reify "tVar", r_reify "tMeta", r_reify "tEvar",
      r_reify "tSort", r_reify "tCast", r_reify "tProd", r_reify "tLambda",
      r_reify "tLetIn", r_reify "tApp", r_reify "tCase", r_reify "tFix",
-     r_reify "tConstruct", r_reify "tConst", r_reify "tInd", r_reify "tCoFix", r_reify "tProj",
-     r_reify "tInt")
+     r_reify "tConstruct", r_reify "tConst", r_reify "tInd", r_reify "tCoFix", r_reify "tProj")
+  (* let tInt = r_reify "tInt" *)
 
   let tlevel = resolve_symbol pkg_level "t"
   let tLevel = resolve_symbol pkg_level "Level"
@@ -297,7 +297,9 @@ struct
 
   let quote_uint63 x = x
 
-  let mkInt x = Constr.mkApp (tInt, [| Constr.mkInt x |])
+  let mkInt x =
+    failwith "Primitive integers not supported"
+    (* Constr.mkApp (tInt, [| Constr.mkInt x |]) *)
 
   let quote_univ_constraint ((l1, ct, l2) : Univ.univ_constraint) =
     let l1 = quote_level l1 in
@@ -520,11 +522,11 @@ struct
     let the_prod = Constr.mkApp (prod_type,[|tident; tlocal_entry|]) in
     to_coq_list the_prod (List.map map l)
 
-  let quote_mutual_inductive_entry (mf, mp, is, mpol) =
+  let quote_mutual_inductive_entry (mf, mp, is, mpol, var) =
     let is = to_coq_list tOne_inductive_entry (List.map make_one_inductive_entry is) in
     let mpr = Constr.mkApp (cNone, [|bool_type|]) in
     let mr = Constr.mkApp (cNone, [|Constr.mkApp (option_type, [|tident|])|])  in
-    Constr.mkApp (tBuild_mutual_inductive_entry, [| mr; mf; mp; is; mpol; mpr |])
+    Constr.mkApp (tBuild_mutual_inductive_entry, [| mr; mf; mp; is; mpol; var; mpr |])
 
 
   let quote_constant_entry (ty, body, ctx) =
