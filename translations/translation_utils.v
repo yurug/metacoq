@@ -85,6 +85,11 @@ Definition tmDebug {A} : A -> TemplateMonad unit
   := tmPrint.
   (* := fun _ => ret tt. *)
 
+Definition universes_of_entry (u : universes_entry) : universe_context :=
+  match u with
+  | Monomorphic_entry ctx => Monomorphic_ctx ctx
+  | Polymorphic_entry ctx => Polymorphic_ctx ctx
+  end.
 
 Definition Translate {tsl : Translation} (ΣE : tsl_context) (id : ident)
   : TemplateMonad tsl_context :=
@@ -134,7 +139,7 @@ Definition Translate {tsl : Translation} (ΣE : tsl_context) (id : ident)
             tmDebug t' ;;
         tmMkDefinition id' t' ;;
             tmDebug "doneu" ;;
-        let decl := {| cst_universes := univs;
+        let decl := {| cst_universes := universes_of_entry univs;
                        cst_type := A; cst_body := Some t |} in
         let Σ' := add_global_decl (ConstantDecl kn decl) (fst ΣE) in
         let E' := (ConstRef kn, tConst id' []) :: (snd ΣE) in
