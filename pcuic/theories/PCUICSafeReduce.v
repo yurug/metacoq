@@ -875,8 +875,6 @@ Section Reduce.
       + econstructor. assumption.
   Qed.
 
-  Notation "∥ T ∥" := (squash T) (at level 10).
-
   Derive Signature for typing.
 
   Lemma inversion_App :

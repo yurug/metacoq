@@ -32,6 +32,8 @@ Infix "<~>" := isEquiv (at level 90).
 
 Record squash (A : Type) : Prop := sq { _ : A }.
 
+Notation "∥ T ∥" := (squash T) (at level 10).
+
 Definition on_snd {A B C} (f : B -> C) (p : A * B) :=
   (fst p, f (snd p)).
 

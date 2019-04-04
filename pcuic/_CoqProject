@@ -26,6 +26,7 @@ theories/PCUICCheckerCompleteness.v
 theories/PCUICRetyping.v
 
 theories/PCUICSafeReduce.v
+theories/PCUICSafeChecker.v
 
 theories/TemplateToPCUIC.v
 theories/TemplateToPCUICCorrectness.v
