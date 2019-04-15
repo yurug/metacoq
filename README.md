@@ -31,7 +31,7 @@ In addition to this representation of terms, Template Coq includes:
 
 - A monad for manipulating global declarations, calling the type
   checker, and inserting them in the global environment, in
-  the stype of MTac.
+  the style of MTac.
   
 Checker
 -------
